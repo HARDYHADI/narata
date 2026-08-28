@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "../supabase/admin";
-import { fetchPopularMovies, fetchMovieDetails } from "../tmdb/client";
+import {
+  fetchPopularMovies,
+  fetchMovieDetails,
+  fetchMovieCredits,
+  fetchMovieReleaseDates,
+} from "../tmdb/client";
 import { mapTmdbMovieToContent } from "../tmdb/mapToContent";
 import { createEmbedding, EMBEDDING_MODEL } from "../embeddings/openai";
 import { buildWorkSummaryChunkText } from "../embeddings/buildWorkSummaryChunk";
@@ -36,8 +41,12 @@ async function findExistingContentId(supabase: SupabaseClient, tmdbId: number) {
 }
 
 async function ingestMovie(supabase: SupabaseClient, tmdbId: number) {
-  const movie = await fetchMovieDetails(tmdbId);
-  const contentRow = mapTmdbMovieToContent(movie);
+  const [movie, credits, releaseDates] = await Promise.all([
+    fetchMovieDetails(tmdbId),
+    fetchMovieCredits(tmdbId),
+    fetchMovieReleaseDates(tmdbId),
+  ]);
+  const contentRow = mapTmdbMovieToContent(movie, credits, releaseDates);
   const genreNames = movie.genres.map((g) => g.name);
   const genreMap = await upsertGenres(supabase, genreNames);
 
