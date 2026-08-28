@@ -21,7 +21,10 @@ export interface TmdbMovieDetails {
   genres: TmdbGenre[];
   origin_country?: string[];
   status: string;
+  poster_path: string | null;
 }
+
+export const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 
 function getAuthHeaders(): HeadersInit {
   const token = process.env.TMDB_API_READ_ACCESS_TOKEN;

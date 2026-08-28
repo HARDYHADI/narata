@@ -1,4 +1,4 @@
-import type { TmdbMovieDetails } from "./client";
+import { TMDB_IMAGE_BASE_URL, type TmdbMovieDetails } from "./client";
 
 const TMDB_STATUS_TO_CONTENT_STATUS: Record<string, string> = {
   Rumored: "UPCOMING",
@@ -19,6 +19,7 @@ export interface ContentRow {
   country_code: string | null;
   original_language: string | null;
   runtime_minutes: number | null;
+  poster_url: string | null;
 }
 
 export function mapTmdbMovieToContent(movie: TmdbMovieDetails): ContentRow {
@@ -35,5 +36,6 @@ export function mapTmdbMovieToContent(movie: TmdbMovieDetails): ContentRow {
     country_code: movie.origin_country?.[0] ?? null,
     original_language: movie.original_language ?? null,
     runtime_minutes: movie.runtime ?? null,
+    poster_url: movie.poster_path ? `${TMDB_IMAGE_BASE_URL}${movie.poster_path}` : null,
   };
 }
