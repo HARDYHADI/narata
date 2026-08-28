@@ -131,6 +131,22 @@ export interface IngestResult {
   error?: string;
 }
 
+export function serializeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+
+  if (error && typeof error === "object") {
+    const withMessage = error as { message?: unknown };
+    if (typeof withMessage.message === "string") return withMessage.message;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      // fall through
+    }
+  }
+
+  return String(error);
+}
+
 export async function runTmdbPopularIngestion(
   page = 1,
   limit = 20
@@ -148,7 +164,7 @@ export async function runTmdbPopularIngestion(
     } catch (error) {
       results.push({
         tmdbId: movie.id,
-        error: error instanceof Error ? error.message : String(error),
+        error: serializeError(error),
       });
     }
   }
