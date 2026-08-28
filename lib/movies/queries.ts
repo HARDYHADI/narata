@@ -99,6 +99,25 @@ export async function fetchMovieDetail(
   return data as unknown as MovieDetail | null;
 }
 
+export async function fetchMoviesByIds(
+  supabase: SupabaseClient,
+  ids: string[]
+): Promise<MovieListItem[]> {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("content")
+    .select(MOVIE_LIST_SELECT)
+    .in("id", ids);
+
+  if (error) {
+    console.error("failed to load movies by id", error);
+    return [];
+  }
+
+  return (data ?? []) as unknown as MovieListItem[];
+}
+
 export async function searchMovies(
   supabase: SupabaseClient,
   query: string,
