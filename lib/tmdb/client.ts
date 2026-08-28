@@ -26,6 +26,35 @@ export interface TmdbMovieDetails {
   vote_count: number;
 }
 
+export interface TmdbCastMember {
+  name: string;
+  order: number;
+}
+
+export interface TmdbCrewMember {
+  name: string;
+  job: string;
+}
+
+export interface TmdbCredits {
+  cast: TmdbCastMember[];
+  crew: TmdbCrewMember[];
+}
+
+export interface TmdbReleaseDateEntry {
+  certification: string;
+  type: number;
+}
+
+export interface TmdbReleaseDatesResult {
+  iso_3166_1: string;
+  release_dates: TmdbReleaseDateEntry[];
+}
+
+export interface TmdbReleaseDatesResponse {
+  results: TmdbReleaseDatesResult[];
+}
+
 export const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 
 function getAuthHeaders(): HeadersInit {
@@ -66,4 +95,12 @@ export async function fetchPopularMovies(page = 1) {
 
 export async function fetchMovieDetails(id: number) {
   return tmdbFetch<TmdbMovieDetails>(`/movie/${id}`, { language: "ko-KR" });
+}
+
+export async function fetchMovieCredits(id: number) {
+  return tmdbFetch<TmdbCredits>(`/movie/${id}/credits`, { language: "ko-KR" });
+}
+
+export async function fetchMovieReleaseDates(id: number) {
+  return tmdbFetch<TmdbReleaseDatesResponse>(`/movie/${id}/release_dates`);
 }

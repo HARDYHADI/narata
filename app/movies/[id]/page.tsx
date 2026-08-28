@@ -8,10 +8,10 @@ import { formatCountry, formatRuntime, formatStatus } from "@/lib/movies/format"
 
 export const revalidate = 60;
 
-// NOTE: director/cast, age rating, videos/OST, watch providers, related
-// works, and gallery/review activity aren't backed by real data yet (no
-// credits, certification, or community tables). Those sections stay as
-// static sample content from the approved design until that schema exists.
+// NOTE: videos/OST, watch providers, related works, and gallery/review
+// activity aren't backed by real data yet (no community tables). Those
+// sections stay as static sample content from the approved design until
+// that schema exists.
 
 export default async function MovieDetailPage({
   params,
@@ -74,15 +74,19 @@ export default async function MovieDetailPage({
             {movie.synopsis_short && <p className="synopsis">{movie.synopsis_short}</p>}
             <div className="facts">
               <b>감독</b>
-              <span>정보 없음</span>
+              <span>{movie.director ?? "정보 없음"}</span>
               <b>출연</b>
-              <span>정보 없음</span>
+              <span>
+                {movie.cast_names && movie.cast_names.length > 0
+                  ? movie.cast_names.join(" · ")
+                  : "정보 없음"}
+              </span>
               <b>공개</b>
               <span>
                 {movie.release_date ?? "미정"} · {formatStatus(movie.status)}
               </span>
               <b>관람 등급</b>
-              <span>정보 없음</span>
+              <span>{movie.age_rating ?? "정보 없음"}</span>
             </div>
             <div className="actions">
               <button className="btn orange">보고 싶어요</button>
