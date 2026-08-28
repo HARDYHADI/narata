@@ -86,11 +86,31 @@ async function tmdbFetch<T>(
   return res.json() as Promise<T>;
 }
 
+export interface TmdbListPage {
+  results: TmdbMovieSummary[];
+  total_pages: number;
+}
+
+export type TmdbPageFetcher = (page: number) => Promise<TmdbListPage>;
+
 export async function fetchPopularMovies(page = 1) {
-  return tmdbFetch<{ results: TmdbMovieSummary[]; total_pages: number }>(
-    "/movie/popular",
-    { page: String(page), language: "ko-KR" }
-  );
+  return tmdbFetch<TmdbListPage>("/movie/popular", {
+    page: String(page),
+    language: "ko-KR",
+  });
+}
+
+/**
+ * Movies sorted by TMDB vote_count (how "known" a title is), for bulk
+ * backfills that want broad, meaningful coverage rather than just what's
+ * currently popular. Paginated the same way as /movie/popular (20/page).
+ */
+export async function fetchMoviesByVoteCount(page = 1) {
+  return tmdbFetch<TmdbListPage>("/discover/movie", {
+    page: String(page),
+    language: "ko-KR",
+    sort_by: "vote_count.desc",
+  });
 }
 
 export async function fetchMovieDetails(id: number) {

@@ -5,6 +5,7 @@ import {
   fetchMovieDetails,
   fetchMovieCredits,
   fetchMovieReleaseDates,
+  type TmdbPageFetcher,
 } from "../tmdb/client";
 import { mapTmdbMovieToContent } from "../tmdb/mapToContent";
 import { createEmbedding, EMBEDDING_MODEL } from "../embeddings/openai";
@@ -168,13 +169,14 @@ async function ingestOne(supabase: SupabaseClient, tmdbId: number): Promise<Inge
   }
 }
 
-export async function runTmdbPopularIngestion(
+export async function runTmdbIngestion(
+  fetchPage: TmdbPageFetcher,
   page = 1,
   limit = 20
 ): Promise<IngestResult[]> {
   const supabase = getSupabaseAdminClient();
-  const popular = await fetchPopularMovies(page);
-  const movies = popular.results.slice(0, limit);
+  const listPage = await fetchPage(page);
+  const movies = listPage.results.slice(0, limit);
 
   const results: IngestResult[] = [];
 
@@ -189,6 +191,13 @@ export async function runTmdbPopularIngestion(
   return results;
 }
 
+export async function runTmdbPopularIngestion(
+  page = 1,
+  limit = 20
+): Promise<IngestResult[]> {
+  return runTmdbIngestion(fetchPopularMovies, page, limit);
+}
+
 export interface BackfillSummary {
   startPage: number;
   requestedPages: number;
@@ -201,11 +210,12 @@ export interface BackfillSummary {
 const DEFAULT_BACKFILL_DEADLINE_MS = 45_000;
 
 /**
- * Ingests multiple TMDB popular-list pages in one call, stopping before the
- * Vercel function timeout if the full range won't fit. `nextPage` in the
- * response tells the caller where to resume.
+ * Ingests multiple pages from a TMDB list source in one call, stopping
+ * before the Vercel function timeout if the full range won't fit.
+ * `nextPage` in the response tells the caller where to resume.
  */
-export async function runTmdbBackfill(
+export async function runTmdbBackfillFromSource(
+  fetchPage: TmdbPageFetcher,
   startPage: number,
   pageCount: number,
   limit: number,
@@ -217,7 +227,7 @@ export async function runTmdbBackfill(
   let page = startPage;
 
   for (; page < startPage + pageCount; page++) {
-    const pageResults = await runTmdbPopularIngestion(page, limit);
+    const pageResults = await runTmdbIngestion(fetchPage, page, limit);
     results.push(...pageResults);
     completedPages++;
 
@@ -236,4 +246,13 @@ export async function runTmdbBackfill(
     nextPage,
     results,
   };
+}
+
+export async function runTmdbBackfill(
+  startPage: number,
+  pageCount: number,
+  limit: number,
+  deadlineMs = DEFAULT_BACKFILL_DEADLINE_MS
+): Promise<BackfillSummary> {
+  return runTmdbBackfillFromSource(fetchPopularMovies, startPage, pageCount, limit, deadlineMs);
 }
