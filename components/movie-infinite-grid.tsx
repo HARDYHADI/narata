@@ -2,13 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { fetchMoviePage, MOVIE_PAGE_SIZE, type MovieListItem } from "@/lib/movies/queries";
+import {
+  fetchFilteredMoviePage,
+  MOVIE_PAGE_SIZE,
+  type MovieFilterParams,
+  type MovieListItem,
+} from "@/lib/movies/queries";
 import MovieCard from "@/components/movie-card";
 
 export default function MovieInfiniteGrid({
   initialMovies,
+  filters = {},
 }: {
   initialMovies: MovieListItem[];
+  filters?: MovieFilterParams;
 }) {
   const [movies, setMovies] = useState(initialMovies);
   const [hasMore, setHasMore] = useState(initialMovies.length === MOVIE_PAGE_SIZE);
@@ -32,7 +39,7 @@ export default function MovieInfiniteGrid({
           return;
         }
 
-        const next = await fetchMoviePage(supabase, nextPageRef.current);
+        const next = await fetchFilteredMoviePage(supabase, nextPageRef.current, filters);
         nextPageRef.current += 1;
         setMovies((prev) => [...prev, ...next]);
         setHasMore(next.length === MOVIE_PAGE_SIZE);
