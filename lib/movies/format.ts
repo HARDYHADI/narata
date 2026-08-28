@@ -1,4 +1,4 @@
-const COUNTRY_LABELS: Record<string, string> = {
+export const COUNTRY_LABELS: Record<string, string> = {
   KR: "한국",
   US: "미국",
   JP: "일본",

@@ -38,6 +38,101 @@ export async function fetchMoviePage(
   return (data ?? []) as unknown as MovieListItem[];
 }
 
+export interface Genre {
+  id: string;
+  name: string;
+}
+
+export async function fetchGenres(supabase: SupabaseClient): Promise<Genre[]> {
+  const { data, error } = await supabase.from("genre").select("id, name").order("name");
+
+  if (error) {
+    console.error("failed to load genres", error);
+    return [];
+  }
+
+  return (data ?? []) as Genre[];
+}
+
+export type MovieSortOption = "latest" | "rating" | "popularity";
+
+export interface MovieFilterParams {
+  genreIds?: string[];
+  countries?: string[];
+  statuses?: string[];
+  yearFrom?: number;
+  yearTo?: number;
+  maxRuntime?: number;
+  sort?: MovieSortOption;
+}
+
+async function resolveGenreContentIds(
+  supabase: SupabaseClient,
+  genreIds: string[]
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("content_genre")
+    .select("content_id")
+    .in("genre_id", genreIds);
+
+  if (error) {
+    console.error("failed to resolve genre filter", error);
+    return [];
+  }
+
+  return Array.from(new Set((data ?? []).map((row) => row.content_id as string)));
+}
+
+export async function fetchFilteredMoviePage(
+  supabase: SupabaseClient,
+  page: number,
+  filters: MovieFilterParams = {}
+): Promise<MovieListItem[]> {
+  const from = page * MOVIE_PAGE_SIZE;
+  const to = from + MOVIE_PAGE_SIZE - 1;
+
+  let query = supabase.from("content").select(MOVIE_LIST_SELECT).eq("content_type", "MOVIE");
+
+  if (filters.genreIds && filters.genreIds.length > 0) {
+    const contentIds = await resolveGenreContentIds(supabase, filters.genreIds);
+    if (contentIds.length === 0) return [];
+    query = query.in("id", contentIds);
+  }
+  if (filters.countries && filters.countries.length > 0) {
+    query = query.in("country_code", filters.countries);
+  }
+  if (filters.statuses && filters.statuses.length > 0) {
+    query = query.in("status", filters.statuses);
+  }
+  if (filters.yearFrom) {
+    query = query.gte("release_date", `${filters.yearFrom}-01-01`);
+  }
+  if (filters.yearTo) {
+    query = query.lte("release_date", `${filters.yearTo}-12-31`);
+  }
+  if (filters.maxRuntime) {
+    query = query.lte("runtime_minutes", filters.maxRuntime);
+  }
+
+  if (filters.sort === "rating") {
+    query = query.order("external_rating", { ascending: false, nullsFirst: false });
+  } else if (filters.sort === "popularity") {
+    query = query.order("external_rating_count", { ascending: false, nullsFirst: false });
+  } else {
+    query = query.order("release_date", { ascending: false, nullsFirst: false });
+  }
+  query = query.order("id", { ascending: false }).range(from, to);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("failed to load filtered movies", error);
+    return [];
+  }
+
+  return (data ?? []) as unknown as MovieListItem[];
+}
+
 export async function fetchRecentMovies(
   supabase: SupabaseClient,
   limit: number
