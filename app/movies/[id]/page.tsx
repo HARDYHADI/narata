@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 
@@ -11,7 +12,7 @@ export default async function MovieDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await params;
+  const { id } = await params;
 
   return (
     <>
@@ -94,7 +95,17 @@ export default async function MovieDetailPage({
           </aside>
         </div>
 
-        <div className="section">
+        <nav className="detail-tabs">
+          <span className="on">주요 정보</span>
+          <Link href={`/movies/${id}/reviews`}>평점·리뷰</Link>
+          <a href="#videos">영상·OST</a>
+          <a href="#related">관련 작품</a>
+          <Link href={`/movies/${id}/gallery`}>
+            갤러리 <b className="orange">328</b>
+          </Link>
+        </nav>
+
+        <div className="section" id="videos">
           <div className="detail-grid">
             <div className="card panel">
               <h3>회차 및 부가 영상</h3>
@@ -127,7 +138,7 @@ export default async function MovieDetailPage({
           </div>
         </div>
 
-        <div className="section">
+        <div className="section" id="related">
           <div className="headrow">
             <div>
               <h2>관련 작품과 세계관</h2>
@@ -160,7 +171,9 @@ export default async function MovieDetailPage({
             <div className="card panel">
               <div className="headrow" style={{ margin: 0 }}>
                 <h3>작품 갤러리 인기글</h3>
-                <span className="pill orange">지금 328명</span>
+                <Link href={`/movies/${id}/gallery`} className="pill orange">
+                  지금 328명
+                </Link>
               </div>
               <div className="feedrow">
                 <span>[분석] 마지막 테이프의 파형 비교해봄</span>
