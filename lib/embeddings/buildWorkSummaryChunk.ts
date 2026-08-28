@@ -4,6 +4,8 @@ interface ContentForChunk {
   synopsisShort: string | null;
   genreNames: string[];
   releaseDate: string | null;
+  director: string | null;
+  castNames: string[] | null;
 }
 
 export function buildWorkSummaryChunkText(content: ContentForChunk): string {
@@ -13,6 +15,10 @@ export function buildWorkSummaryChunkText(content: ContentForChunk): string {
     content.releaseDate ? `개봉일: ${content.releaseDate}` : null,
     content.genreNames.length > 0
       ? `장르: ${content.genreNames.join(", ")}`
+      : null,
+    content.director ? `감독: ${content.director}` : null,
+    content.castNames && content.castNames.length > 0
+      ? `출연: ${content.castNames.join(", ")}`
       : null,
     content.synopsisShort,
   ].filter((line): line is string => Boolean(line));

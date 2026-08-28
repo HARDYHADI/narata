@@ -118,6 +118,39 @@ export async function fetchMoviesByIds(
   return (data ?? []) as unknown as MovieListItem[];
 }
 
+export interface AiCandidateMovie {
+  id: string;
+  canonical_title: string;
+  release_date: string | null;
+  poster_url: string | null;
+  synopsis_short: string | null;
+  director: string | null;
+  cast_names: string[] | null;
+  content_genre: { genre: { name: string } | null }[];
+}
+
+const AI_CANDIDATE_SELECT =
+  "id, canonical_title, release_date, poster_url, synopsis_short, director, cast_names, content_genre(genre(name))";
+
+export async function fetchAiCandidateMovies(
+  supabase: SupabaseClient,
+  ids: string[]
+): Promise<AiCandidateMovie[]> {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("content")
+    .select(AI_CANDIDATE_SELECT)
+    .in("id", ids);
+
+  if (error) {
+    console.error("failed to load AI candidate movies", error);
+    return [];
+  }
+
+  return (data ?? []) as unknown as AiCandidateMovie[];
+}
+
 export async function searchMovies(
   supabase: SupabaseClient,
   query: string,
