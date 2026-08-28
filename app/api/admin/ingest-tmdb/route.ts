@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runTmdbPopularIngestion } from "@/lib/ingestion/ingestTmdbPopular";
+import { runTmdbPopularIngestion, serializeError } from "@/lib/ingestion/ingestTmdbPopular";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,9 +19,6 @@ export async function GET(request: NextRequest) {
     const results = await runTmdbPopularIngestion(page, limit);
     return NextResponse.json({ page, limit, results });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: serializeError(error) }, { status: 500 });
   }
 }
