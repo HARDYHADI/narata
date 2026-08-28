@@ -2,15 +2,15 @@ import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import MovieBar from "@/components/movie-bar";
+import MovieCard from "@/components/movie-card";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { fetchRecentMovies } from "@/lib/movies/queries";
 
-const NOW_SHOWING = [
-  { tone: "tone-1", tag: "MYSTERY · 15", title: "검은 파도의\n밤", name: "검은 파도의 밤", rating: "4.6", note: "예매 1위" },
-  { tone: "tone-2", tag: "DRAMA · 12", title: "여름의\n증언", name: "여름의 증언", rating: "4.4", note: "리뷰 3.1천" },
-  { tone: "tone-3", tag: "THRILLER · 18", title: "낯선\n신호", name: "낯선 신호", rating: "4.2", note: "토론 급상승" },
-  { tone: "tone-4", tag: "ANIMATION · ALL", title: "별의\n정원", name: "별의 정원", rating: "4.7", note: "가족 영화" },
-  { tone: "tone-1", tag: "DOCUMENTARY · ALL", title: "숲이 기억하는\n것", name: "숲이 기억하는 것", rating: "4.5", note: "독립영화" },
-];
+export const revalidate = 60;
 
+// NOTE: "영화 소식과 큐레이션" (editorial news) and "실시간 영화 순위" (live
+// ranking) have no backing data source yet — these stay as static sample
+// content from the approved design.
 const NEWS = [
   { tag: "개봉 예정", title: "9월 기대작 12편, 공개 일정 한눈에 보기", time: "2시간 전" },
   { tag: "기획전", title: "비 오는 날 보기 좋은 미스터리 영화", time: "오늘" },
@@ -24,7 +24,12 @@ const RANKING = [
   { rank: 4, title: "낯선 신호", change: "▼ 2" },
 ];
 
-export default function MovieHomePage() {
+export default async function MovieHomePage() {
+  const supabase = getSupabaseClient();
+  const recentMovies = supabase ? await fetchRecentMovies(supabase, 10) : [];
+  const heroMovies = recentMovies.slice(0, 4);
+  const featured = recentMovies[0];
+
   return (
     <>
       <SiteHeader
@@ -44,73 +49,54 @@ export default function MovieHomePage() {
       <div className="wrap">
         <div className="hero">
           <div>
-            <span className="pill orange">이번 주 영화 1위</span>
+            <span className="pill orange">최근 수집된 영화</span>
             <h1>
               극장에서 시작해
               <br />
               이야기로 이어지는 영화
             </h1>
-            <p>국내외 영화 정보, 평점, 리뷰와 실시간 갤러리를 한곳에서 만나보세요.</p>
-            <div className="actions">
-              <Link href="/movies/1" className="btn orange">
-                검은 파도의 밤 보기
-              </Link>
-            </div>
+            <p>TMDB에서 수집한 영화 정보를 평점, 장르와 함께 한곳에서 만나보세요.</p>
+            {featured && (
+              <div className="actions">
+                <Link href={`/movies/${featured.id}`} className="btn orange">
+                  {featured.canonical_title} 보기
+                </Link>
+              </div>
+            )}
           </div>
           <div className="hero-grid">
-            <div className="genre">
-              <small>미스터리</small>
-              <b>검은 파도의 밤</b>
-            </div>
-            <div className="genre">
-              <small>독립 영화</small>
-              <b>여름의 증언</b>
-            </div>
-            <div className="genre">
-              <small>애니메이션</small>
-              <b>별의 정원</b>
-            </div>
-            <div className="genre">
-              <small>다큐멘터리</small>
-              <b>숲이 기억하는 것</b>
-            </div>
+            {heroMovies.length > 0 ? (
+              heroMovies.map((movie) => (
+                <div key={movie.id} className="genre">
+                  <small>{movie.content_genre[0]?.genre?.name ?? "영화"}</small>
+                  <b>{movie.canonical_title}</b>
+                </div>
+              ))
+            ) : (
+              <div className="genre">
+                <small>MOVIE</small>
+                <b>아직 수집된 영화가 없어요</b>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="section" style={{ borderTop: 0, paddingTop: 0 }}>
           <div className="headrow">
             <div>
-              <h2>지금 상영 중</h2>
-              <div className="sub">극장 상영작을 평점과 예매 화제성으로 정렬했어요</div>
-            </div>
-            <div className="tabs">
-              <button className="tab on">전체</button>
-              <button className="tab">한국</button>
-              <button className="tab">해외</button>
-              <button className="tab">독립·예술</button>
+              <h2>최근 수집된 영화</h2>
+              <div className="sub">TMDB에서 가져온 영화를 공개일 최신순으로 보여줍니다</div>
             </div>
           </div>
-          <div className="posters">
-            {NOW_SHOWING.map((item) => (
-              <div key={item.name}>
-                <div className={`poster ${item.tone}`}>
-                  <small>{item.tag}</small>
-                  <strong>
-                    {item.title.split("\n").map((line, i) => (
-                      <span key={i}>
-                        {i > 0 && <br />}
-                        {line}
-                      </span>
-                    ))}
-                  </strong>
-                </div>
-                <div className="meta">
-                  <b>{item.name}</b>
-                  <span className="stars">★ {item.rating}</span> · {item.note}
-                </div>
-              </div>
-            ))}
-          </div>
+          {recentMovies.length === 0 ? (
+            <p className="muted">아직 등록된 영화가 없습니다.</p>
+          ) : (
+            <div className="content-grid">
+              {recentMovies.map((movie) => (
+                <MovieCard key={movie.id} movie={movie} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="section">
