@@ -147,6 +147,16 @@ export function serializeError(error: unknown): string {
   return String(error);
 }
 
+const INGEST_CONCURRENCY = 5;
+
+async function ingestOne(supabase: SupabaseClient, tmdbId: number): Promise<IngestResult> {
+  try {
+    return await ingestMovie(supabase, tmdbId);
+  } catch (error) {
+    return { tmdbId, error: serializeError(error) };
+  }
+}
+
 export async function runTmdbPopularIngestion(
   page = 1,
   limit = 20
@@ -157,16 +167,12 @@ export async function runTmdbPopularIngestion(
 
   const results: IngestResult[] = [];
 
-  for (const movie of movies) {
-    try {
-      const ingested = await ingestMovie(supabase, movie.id);
-      results.push(ingested);
-    } catch (error) {
-      results.push({
-        tmdbId: movie.id,
-        error: serializeError(error),
-      });
-    }
+  for (let i = 0; i < movies.length; i += INGEST_CONCURRENCY) {
+    const batch = movies.slice(i, i + INGEST_CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map((movie) => ingestOne(supabase, movie.id))
+    );
+    results.push(...batchResults);
   }
 
   return results;
