@@ -158,7 +158,7 @@ export function serializeError(error: unknown): string {
   return String(error);
 }
 
-const INGEST_CONCURRENCY = 5;
+const INGEST_CONCURRENCY = 8;
 
 async function ingestOne(supabase: SupabaseClient, tmdbId: number): Promise<IngestResult> {
   try {
@@ -187,4 +187,53 @@ export async function runTmdbPopularIngestion(
   }
 
   return results;
+}
+
+export interface BackfillSummary {
+  startPage: number;
+  requestedPages: number;
+  completedPages: number;
+  /** Page to pass as `page` on the next call to finish the remaining range, or null if done. */
+  nextPage: number | null;
+  results: IngestResult[];
+}
+
+const DEFAULT_BACKFILL_DEADLINE_MS = 45_000;
+
+/**
+ * Ingests multiple TMDB popular-list pages in one call, stopping before the
+ * Vercel function timeout if the full range won't fit. `nextPage` in the
+ * response tells the caller where to resume.
+ */
+export async function runTmdbBackfill(
+  startPage: number,
+  pageCount: number,
+  limit: number,
+  deadlineMs = DEFAULT_BACKFILL_DEADLINE_MS
+): Promise<BackfillSummary> {
+  const startedAt = Date.now();
+  const results: IngestResult[] = [];
+  let completedPages = 0;
+  let page = startPage;
+
+  for (; page < startPage + pageCount; page++) {
+    const pageResults = await runTmdbPopularIngestion(page, limit);
+    results.push(...pageResults);
+    completedPages++;
+
+    if (Date.now() - startedAt > deadlineMs) {
+      page++;
+      break;
+    }
+  }
+
+  const nextPage = completedPages < pageCount ? page : null;
+
+  return {
+    startPage,
+    requestedPages: pageCount,
+    completedPages,
+    nextPage,
+    results,
+  };
 }

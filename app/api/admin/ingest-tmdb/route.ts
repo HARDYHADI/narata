@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runTmdbPopularIngestion, serializeError } from "@/lib/ingestion/ingestTmdbPopular";
+import { runTmdbBackfill, serializeError } from "@/lib/ingestion/ingestTmdbPopular";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,10 +14,11 @@ export async function GET(request: NextRequest) {
 
   const page = Number(request.nextUrl.searchParams.get("page") ?? "1");
   const limit = Number(request.nextUrl.searchParams.get("limit") ?? "5");
+  const pages = Number(request.nextUrl.searchParams.get("pages") ?? "1");
 
   try {
-    const results = await runTmdbPopularIngestion(page, limit);
-    return NextResponse.json({ page, limit, results });
+    const summary = await runTmdbBackfill(page, pages, limit);
+    return NextResponse.json(summary);
   } catch (error) {
     return NextResponse.json({ error: serializeError(error) }, { status: 500 });
   }
