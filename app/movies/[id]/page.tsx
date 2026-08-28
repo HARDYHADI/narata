@@ -1,11 +1,17 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { fetchMovieDetail } from "@/lib/movies/queries";
+import { formatCountry, formatRuntime, formatStatus } from "@/lib/movies/format";
 
-// TODO: wire this screen up to the real content row (Supabase `content`,
-// `content_genre`, `content_relation`, community/rating aggregates) once the
-// rest of the schema (ratings, reviews, providers, episodes) exists. For now
-// this renders the fixed sample content from the approved design.
+export const revalidate = 60;
+
+// NOTE: director/cast, age rating, videos/OST, watch providers, related
+// works, and gallery/review activity aren't backed by real data yet (no
+// credits, certification, or community tables). Those sections stay as
+// static sample content from the approved design until that schema exists.
 
 export default async function MovieDetailPage({
   params,
@@ -13,6 +19,16 @@ export default async function MovieDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const supabase = getSupabaseClient();
+  const movie = supabase ? await fetchMovieDetail(supabase, id) : null;
+
+  if (!movie) notFound();
+
+  const genreNames = movie.content_genre.map((cg) => cg.genre?.name).filter(Boolean);
+  const releaseYear = movie.release_date?.slice(0, 4);
+  const country = formatCountry(movie.country_code);
+  const runtime = formatRuntime(movie.runtime_minutes);
+  const subLine = [movie.original_title, country, runtime].filter(Boolean).join(" · ");
 
   return (
     <>
@@ -25,38 +41,48 @@ export default async function MovieDetailPage({
       <div className="wrap">
         <div className="detail-hero">
           <div className="cover">
-            <small>ORIGINAL SERIES</small>
-            <strong>
-              검은 파도의
-              <br />밤
-            </strong>
-            <small>THE NIGHT OF BLACK WAVES</small>
+            {movie.poster_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={movie.poster_url}
+                alt={movie.canonical_title}
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 14 }}
+              />
+            ) : (
+              <>
+                <small>MOVIE</small>
+                <strong>{movie.canonical_title}</strong>
+                <small>{movie.original_title ?? ""}</small>
+              </>
+            )}
           </div>
           <div className="detail-copy">
-            <span className="eyebrow">MOVIE · 2026</span>
-            <h1>검은 파도의 밤</h1>
-            <div className="original">The Night of Black Waves · 한국 · 128분</div>
-            <div className="tagrow">
-              <span className="pill dark">미스터리</span>
-              <span className="pill">드라마</span>
-              <span className="pill">외딴 섬</span>
-              <span className="pill">가족의 비밀</span>
-              <span className="pill">느린 호흡</span>
-            </div>
-            <p className="synopsis">
-              십 년 만에 고향 섬으로 돌아온 기록원 서윤은, 사라진 아버지가 남긴 녹음테이프에서 매일 밤
-              같은 파도 소리를 듣는다. 섬 주민들의 서로 다른 기억을 따라갈수록 가족이 숨겨온 진실과
-              마주한다.
-            </p>
+            <span className="eyebrow">
+              영화{releaseYear ? ` · ${releaseYear}` : ""}
+            </span>
+            <h1>{movie.canonical_title}</h1>
+            {subLine && <div className="original">{subLine}</div>}
+            {genreNames.length > 0 && (
+              <div className="tagrow">
+                {genreNames.map((name, i) => (
+                  <span key={name} className={i === 0 ? "pill dark" : "pill"}>
+                    {name}
+                  </span>
+                ))}
+              </div>
+            )}
+            {movie.synopsis_short && <p className="synopsis">{movie.synopsis_short}</p>}
             <div className="facts">
               <b>감독</b>
-              <span>박해원</span>
+              <span>정보 없음</span>
               <b>출연</b>
-              <span>윤서진 · 김도현 · 한예리</span>
+              <span>정보 없음</span>
               <b>공개</b>
-              <span>2026.08.14 · 극장 개봉</span>
+              <span>
+                {movie.release_date ?? "미정"} · {formatStatus(movie.status)}
+              </span>
               <b>관람 등급</b>
-              <span>15세 이상 관람가</span>
+              <span>정보 없음</span>
             </div>
             <div className="actions">
               <button className="btn orange">보고 싶어요</button>
@@ -65,31 +91,28 @@ export default async function MovieDetailPage({
             </div>
           </div>
           <aside className="card scorebox">
-            <div className="eyebrow">NARATA SCORE</div>
-            <div className="scoretop">
-              <strong>4.6</strong>
-              <span className="muted">/ 5.0</span>
-            </div>
-            <div className="stars" style={{ fontSize: 22, marginTop: 8 }}>
-              ★★★★★
-            </div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-              평가 12,842개
-            </div>
-            <div className="bars">
-              {[
-                { label: "5", pct: 78 },
-                { label: "4", pct: 49 },
-                { label: "3", pct: 19 },
-                { label: "2", pct: 8 },
-                { label: "1", pct: 4 },
-              ].map((b) => (
-                <div key={b.label} className="bar">
-                  <span>{b.label}</span>
-                  <i style={{ ["--w" as string]: `${b.pct}%` }} />
-                  <span>{b.pct}%</span>
+            <div className="eyebrow">TMDB 평점</div>
+            {movie.external_rating != null ? (
+              <>
+                <div className="scoretop">
+                  <strong>{movie.external_rating.toFixed(1)}</strong>
+                  <span className="muted">/ 10</span>
                 </div>
-              ))}
+                <div className="stars" style={{ fontSize: 22, marginTop: 8 }}>
+                  {"★".repeat(Math.round(movie.external_rating / 2))}
+                  {"☆".repeat(5 - Math.round(movie.external_rating / 2))}
+                </div>
+                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                  {movie.external_rating_count?.toLocaleString() ?? 0}명 참여 (TMDB)
+                </div>
+              </>
+            ) : (
+              <div className="muted" style={{ marginTop: 8 }}>
+                아직 평점 정보가 없어요.
+              </div>
+            )}
+            <div className="muted" style={{ fontSize: 12, marginTop: 16 }}>
+              나라타 자체 평점은 아직 준비 중이에요.
             </div>
             <button className="btn orange ratebtn">내 별점 남기기</button>
           </aside>

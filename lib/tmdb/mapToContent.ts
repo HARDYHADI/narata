@@ -20,6 +20,8 @@ export interface ContentRow {
   original_language: string | null;
   runtime_minutes: number | null;
   poster_url: string | null;
+  external_rating: number | null;
+  external_rating_count: number | null;
 }
 
 export function mapTmdbMovieToContent(movie: TmdbMovieDetails): ContentRow {
@@ -37,5 +39,7 @@ export function mapTmdbMovieToContent(movie: TmdbMovieDetails): ContentRow {
     original_language: movie.original_language ?? null,
     runtime_minutes: movie.runtime ?? null,
     poster_url: movie.poster_path ? `${TMDB_IMAGE_BASE_URL}${movie.poster_path}` : null,
+    external_rating: movie.vote_count > 0 ? movie.vote_average : null,
+    external_rating_count: movie.vote_count > 0 ? movie.vote_count : null,
   };
 }

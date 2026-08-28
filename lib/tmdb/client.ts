@@ -22,6 +22,8 @@ export interface TmdbMovieDetails {
   origin_country?: string[];
   status: string;
   poster_path: string | null;
+  vote_average: number;
+  vote_count: number;
 }
 
 export const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";

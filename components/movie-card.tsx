@@ -16,6 +16,12 @@ export default function MovieCard({ movie }: { movie: MovieListItem }) {
         <b style={{ display: "block", fontSize: 15 }}>{movie.canonical_title}</b>
         <div className="sub">
           {movie.release_date?.slice(0, 4) ?? "미정"}
+          {movie.external_rating != null && (
+            <>
+              {" "}
+              · <span className="stars">★ {movie.external_rating.toFixed(1)}</span>
+            </>
+          )}
           {movie.content_genre.length > 0 && (
             <>
               {" "}
