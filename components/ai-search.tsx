@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { MovieListItem } from "@/lib/movies/queries";
 
-interface SearchResult extends MovieListItem {
-  similarity: number;
-  matchedText: string;
+interface SearchResult {
+  id: string;
+  canonical_title: string;
+  release_date: string | null;
+  poster_url: string | null;
+  confidence: number;
+  reason: string;
 }
 
 const THUMB_TONES = ["", "tone-2", "tone-3"];
@@ -102,13 +105,11 @@ export default function AiSearch() {
                           </div>
                         )}
                       </div>
-                      <div className="confidence">
-                        일치 가능성 {Math.min(100, Math.max(0, Math.round(movie.similarity * 100)))}%
-                      </div>
+                      <div className="confidence">일치 가능성 {movie.confidence}%</div>
                       <h3>
                         <Link href={`/movies/${movie.id}`}>{movie.canonical_title}</Link>
                       </h3>
-                      <div className="reason">{movie.matchedText}</div>
+                      <div className="reason">{movie.reason}</div>
                       <div className="feedback">
                         <button type="button">이 작품 맞아요</button>
                         <button type="button">아니에요</button>

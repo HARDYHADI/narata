@@ -108,6 +108,8 @@ async function ingestMovie(supabase: SupabaseClient, tmdbId: number) {
     synopsisShort: contentRow.synopsis_short,
     genreNames,
     releaseDate: contentRow.release_date,
+    director: contentRow.director,
+    castNames: contentRow.cast_names,
   });
 
   const embedding = await createEmbedding(chunkText);
