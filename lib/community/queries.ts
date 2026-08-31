@@ -385,11 +385,11 @@ export interface FeedPostItem {
   guest_nickname: string | null;
   ip_hash: string | null;
   profile: { nickname: string } | null;
-  gallery: { name: string; content: { canonical_title: string; content_type: string } | null } | null;
+  gallery: { name: string; content: { id: string; canonical_title: string; content_type: string } | null } | null;
 }
 
 const FEED_SELECT =
-  "id, gallery_id, head, title, is_notice, comment_count, view_count, like_count, created_at, user_id, guest_nickname, ip_hash, profile(nickname), gallery(name, content(canonical_title, content_type))";
+  "id, gallery_id, head, title, is_notice, comment_count, view_count, like_count, created_at, user_id, guest_nickname, ip_hash, profile(nickname), gallery(name, content(id, canonical_title, content_type))";
 
 export async function fetchCommunityFeed(
   supabase: SupabaseClient,
