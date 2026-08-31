@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { submitAiSearchFeedback, type AiSearchFeedback } from "@/lib/taste/queries";
 
 interface SearchResult {
   id: string;
@@ -11,6 +13,8 @@ interface SearchResult {
   confidence: number;
   reason: string;
 }
+
+type FeedbackState = "idle" | "submitting" | AiSearchFeedback | "need_login";
 
 const THUMB_TONES = ["", "tone-2", "tone-3"];
 
@@ -26,6 +30,8 @@ export default function AiSearch() {
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [searchLogId, setSearchLogId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, FeedbackState>>({});
 
   async function runSearch(text: string) {
     const trimmed = text.trim();
@@ -35,11 +41,24 @@ export default function AiSearch() {
     setSubmittedQuery(trimmed);
     setStatus("loading");
     setErrorMessage(null);
+    setSearchLogId(null);
+    setFeedback({});
 
     try {
+      const supabase = getSupabaseClient();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (supabase) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers.Authorization = `Bearer ${session.access_token}`;
+        }
+      }
+
       const res = await fetch("/api/ai/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ query: trimmed }),
       });
       const data = await res.json();
@@ -51,11 +70,33 @@ export default function AiSearch() {
       }
 
       setResults(data.results ?? []);
+      setSearchLogId(data.search_log_id ?? null);
       setStatus("done");
     } catch {
       setErrorMessage("검색에 실패했어요. 잠시 후 다시 시도해주세요.");
       setStatus("error");
     }
+  }
+
+  async function giveFeedback(contentId: string, value: AiSearchFeedback) {
+    if (!searchLogId) return;
+    if (feedback[contentId] === "submitting" || feedback[contentId] === "RELEVANT" || feedback[contentId] === "NOT_RELEVANT") {
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setFeedback((prev) => ({ ...prev, [contentId]: "need_login" }));
+      return;
+    }
+
+    setFeedback((prev) => ({ ...prev, [contentId]: "submitting" }));
+    const result = await submitAiSearchFeedback(supabase, searchLogId, contentId, value);
+    setFeedback((prev) => ({ ...prev, [contentId]: result.success ? value : "idle" }));
   }
 
   return (
@@ -111,8 +152,28 @@ export default function AiSearch() {
                       </h3>
                       <div className="reason">{movie.reason}</div>
                       <div className="feedback">
-                        <button type="button">이 작품 맞아요</button>
-                        <button type="button">아니에요</button>
+                        {feedback[movie.id] === "RELEVANT" || feedback[movie.id] === "NOT_RELEVANT" ? (
+                          <span className="sub">감사해요, 반영할게요.</span>
+                        ) : feedback[movie.id] === "need_login" ? (
+                          <span className="sub">로그인하면 피드백을 남길 수 있어요.</span>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={feedback[movie.id] === "submitting"}
+                              onClick={() => giveFeedback(movie.id, "RELEVANT")}
+                            >
+                              이 작품 맞아요
+                            </button>
+                            <button
+                              type="button"
+                              disabled={feedback[movie.id] === "submitting"}
+                              onClick={() => giveFeedback(movie.id, "NOT_RELEVANT")}
+                            >
+                              아니에요
+                            </button>
+                          </>
+                        )}
                       </div>
                     </article>
                   ))}
