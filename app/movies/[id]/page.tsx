@@ -9,6 +9,7 @@ import { formatCountry, formatRuntime, formatStatus } from "@/lib/movies/format"
 import RatingWidget from "@/components/reviews/rating-widget";
 import WatchlistButton from "@/components/watchlist-button";
 import CollectionPickerButton from "@/components/collection-picker-button";
+import MovieQaBox from "@/components/movie-qa-box";
 
 export const revalidate = 60;
 
@@ -308,12 +309,7 @@ export default async function MovieDetailPage({
               </div>
             </div>
           </div>
-          <div className="qbox">
-            <span className="pill orange">AI에게 질문</span>
-            <b>이 작품에 대해 궁금한 점이 있나요?</b>
-            <div className="prompt">“마지막 장면 해석을 스포일러 표시해서 알려줘”</div>
-            <button className="btn orange">질문하기</button>
-          </div>
+          <MovieQaBox contentId={movie.id} />
         </div>
       </div>
 
