@@ -3,6 +3,7 @@ import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import MovieBar from "@/components/movie-bar";
 import MovieInfiniteGrid from "@/components/movie-infinite-grid";
+import WatchlistView from "@/components/watchlist-view";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import {
   fetchFilteredMoviePage,
@@ -53,6 +54,7 @@ type SearchParams = {
   year?: string;
   runtime?: string;
   sort?: string;
+  view?: string;
 };
 
 function buildSortHref(params: SearchParams, sort: MovieSortOption): string {
@@ -72,6 +74,43 @@ export default async function MoviesPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
+
+  if (params.view === "collection") {
+    return (
+      <>
+        <SiteHeader
+          active="content"
+          searchPlaceholder="제목, 인물, 장면을 검색해보세요"
+          actions={
+            <>
+              <Link href="/ai" className="btn orange">
+                AI 찾기
+              </Link>
+              <button className="btn">로그인</button>
+            </>
+          }
+        />
+        <MovieBar active="collection" />
+
+        <div className="wrap">
+          <div className="page-title">
+            <div>
+              <span className="eyebrow">MY WATCHLIST</span>
+              <h1>내 컬렉션</h1>
+              <p>“보고 싶어요”에 담아둔 작품을 모아봤어요.</p>
+            </div>
+          </div>
+          <WatchlistView />
+        </div>
+
+        <SiteFooter
+          title="모든 매체를 한곳에서"
+          subtitle="영화, 드라마, 애니, 웹툰, 웹소설을 통합 검색하고 평가하세요."
+        />
+      </>
+    );
+  }
+
   const supabase = getSupabaseClient();
   const genres = supabase ? await fetchGenres(supabase) : [];
 

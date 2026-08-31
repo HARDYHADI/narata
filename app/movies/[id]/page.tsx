@@ -7,6 +7,8 @@ import { fetchMovieDetail } from "@/lib/movies/queries";
 import { fetchContentVideos, fetchContentWatchProviders } from "@/lib/movies/media";
 import { formatCountry, formatRuntime, formatStatus } from "@/lib/movies/format";
 import RatingWidget from "@/components/reviews/rating-widget";
+import WatchlistButton from "@/components/watchlist-button";
+import CollectionPickerButton from "@/components/collection-picker-button";
 
 export const revalidate = 60;
 
@@ -112,8 +114,8 @@ export default async function MovieDetailPage({
               <span>{movie.age_rating ?? "정보 없음"}</span>
             </div>
             <div className="actions">
-              <button className="btn orange">보고 싶어요</button>
-              <button className="btn ghost">컬렉션에 추가</button>
+              <WatchlistButton contentId={movie.id} />
+              <CollectionPickerButton contentId={movie.id} />
               <button className="btn ghost">공유</button>
             </div>
           </div>
