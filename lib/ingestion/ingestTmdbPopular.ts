@@ -5,7 +5,11 @@ import {
   fetchMovieDetails,
   fetchMovieCredits,
   fetchMovieReleaseDates,
+  fetchMovieVideos,
+  fetchMovieWatchProviders,
+  TMDB_IMAGE_BASE_URL,
   type TmdbPageFetcher,
+  type TmdbVideo,
 } from "../tmdb/client";
 import { mapTmdbMovieToContent } from "../tmdb/mapToContent";
 import { createEmbedding, EMBEDDING_MODEL } from "../embeddings/openai";
@@ -29,6 +33,100 @@ async function upsertGenres(supabase: SupabaseClient, genreNames: string[]) {
   return new Map((data ?? []).map((g) => [g.name as string, g.id as string]));
 }
 
+type ContentVideoType = "TRAILER" | "TEASER" | "INTERVIEW" | "OST" | "CLIP";
+
+function mapTmdbVideoType(video: TmdbVideo): ContentVideoType {
+  const name = video.name.toLowerCase();
+  if (name.includes("ost") || name.includes("music") || name.includes("soundtrack")) {
+    return "OST";
+  }
+  if (name.includes("interview") || name.includes("인터뷰")) {
+    return "INTERVIEW";
+  }
+
+  switch (video.type) {
+    case "Trailer":
+      return "TRAILER";
+    case "Teaser":
+      return "TEASER";
+    default:
+      return "CLIP";
+  }
+}
+
+function buildContentVideoRows(contentId: string, videos: TmdbVideo[]) {
+  return videos
+    .filter((v) => v.site === "YouTube")
+    .map((v) => ({
+      content_id: contentId,
+      video_type: mapTmdbVideoType(v),
+      title: v.name,
+      url: `https://www.youtube.com/watch?v=${v.key}`,
+      provider_label: "YouTube",
+      duration_seconds: null,
+      published_at: v.published_at || null,
+    }));
+}
+
+type WatchProviderRegionType = "STREAMING" | "RENT" | "BUY";
+
+interface KrWatchProviderEntry {
+  provider_name: string;
+  type: WatchProviderRegionType;
+  logo_path: string | null;
+}
+
+const WATCH_PROVIDER_REGION = "KR";
+const WATCH_PROVIDER_LIST_TYPES: Array<["flatrate" | "rent" | "buy", WatchProviderRegionType]> = [
+  ["flatrate", "STREAMING"],
+  ["rent", "RENT"],
+  ["buy", "BUY"],
+];
+
+function collectKrWatchProviderEntries(
+  watchProviders: Awaited<ReturnType<typeof fetchMovieWatchProviders>>
+): { entries: KrWatchProviderEntry[]; link: string | null } {
+  const kr = watchProviders.results[WATCH_PROVIDER_REGION];
+  if (!kr) return { entries: [], link: null };
+
+  const entries: KrWatchProviderEntry[] = [];
+  for (const [listKey, type] of WATCH_PROVIDER_LIST_TYPES) {
+    for (const p of kr[listKey] ?? []) {
+      entries.push({ provider_name: p.provider_name, type, logo_path: p.logo_path });
+    }
+  }
+
+  return { entries, link: kr.link ?? null };
+}
+
+async function upsertWatchProviders(
+  supabase: SupabaseClient,
+  entries: KrWatchProviderEntry[]
+) {
+  if (entries.length === 0) return new Map<string, string>();
+
+  const logoByName = new Map<string, string | null>();
+  for (const entry of entries) {
+    if (!logoByName.has(entry.provider_name)) {
+      logoByName.set(entry.provider_name, entry.logo_path);
+    }
+  }
+
+  const rows = Array.from(logoByName.entries()).map(([name, logoPath]) => ({
+    name,
+    logo_url: logoPath ? `${TMDB_IMAGE_BASE_URL}${logoPath}` : null,
+  }));
+
+  const { data, error } = await supabase
+    .from("watch_provider")
+    .upsert(rows, { onConflict: "name" })
+    .select("id, name");
+
+  if (error) throw error;
+
+  return new Map((data ?? []).map((p) => [p.name as string, p.id as string]));
+}
+
 async function findExistingContentId(supabase: SupabaseClient, tmdbId: number) {
   const { data, error } = await supabase
     .from("external_identifier")
@@ -42,10 +140,12 @@ async function findExistingContentId(supabase: SupabaseClient, tmdbId: number) {
 }
 
 async function ingestMovie(supabase: SupabaseClient, tmdbId: number) {
-  const [movie, credits, releaseDates] = await Promise.all([
+  const [movie, credits, releaseDates, videos, watchProviders] = await Promise.all([
     fetchMovieDetails(tmdbId),
     fetchMovieCredits(tmdbId),
     fetchMovieReleaseDates(tmdbId),
+    fetchMovieVideos(tmdbId),
+    fetchMovieWatchProviders(tmdbId),
   ]);
   const contentRow = mapTmdbMovieToContent(movie, credits, releaseDates);
   const genreNames = movie.genres.map((g) => g.name);
@@ -100,6 +200,42 @@ async function ingestMovie(supabase: SupabaseClient, tmdbId: number) {
       genreIds.map((genreId) => ({ content_id: contentId, genre_id: genreId })),
       { onConflict: "content_id,genre_id" }
     );
+    if (error) throw error;
+  }
+
+  const { entries: watchProviderEntries, link: watchProviderLink } =
+    collectKrWatchProviderEntries(watchProviders);
+  const watchProviderMap = await upsertWatchProviders(supabase, watchProviderEntries);
+
+  const contentWatchProviderRows = watchProviderEntries
+    .map((entry) => {
+      const providerId = watchProviderMap.get(entry.provider_name);
+      if (!providerId) return null;
+      return {
+        content_id: contentId,
+        provider_id: providerId,
+        country_code: WATCH_PROVIDER_REGION,
+        type: entry.type,
+        url: watchProviderLink,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  if (contentWatchProviderRows.length > 0) {
+    const { error } = await supabase
+      .from("content_watch_provider")
+      .upsert(contentWatchProviderRows, {
+        onConflict: "content_id,provider_id,country_code,type",
+      });
+    if (error) throw error;
+  }
+
+  const contentVideoRows = buildContentVideoRows(contentId, videos.results);
+
+  await supabase.from("content_video").delete().eq("content_id", contentId);
+
+  if (contentVideoRows.length > 0) {
+    const { error } = await supabase.from("content_video").insert(contentVideoRows);
     if (error) throw error;
   }
 

@@ -4,15 +4,30 @@ import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchMovieDetail } from "@/lib/movies/queries";
+import { fetchContentVideos, fetchContentWatchProviders } from "@/lib/movies/media";
 import { formatCountry, formatRuntime, formatStatus } from "@/lib/movies/format";
 import RatingWidget from "@/components/reviews/rating-widget";
 
 export const revalidate = 60;
 
-// NOTE: videos/OST, watch providers, related works, and gallery/review
-// activity aren't backed by real data yet (no community tables). Those
-// sections stay as static sample content from the approved design until
-// that schema exists.
+// NOTE: related works and gallery/review activity aren't backed by real
+// data yet (no community tables). Those sections stay as static sample
+// content from the approved design until that schema exists.
+
+const VIDEO_TYPE_LABELS: Record<string, string> = {
+  TRAILER: "예고편",
+  TEASER: "티저",
+  INTERVIEW: "인터뷰",
+  OST: "OST",
+  CLIP: "영상 클립",
+};
+
+const PROVIDER_TYPE_LABELS: Record<string, string> = {
+  STREAMING: "스트리밍",
+  RENT: "대여",
+  BUY: "구매",
+  THEATER: "극장",
+};
 
 export default async function MovieDetailPage({
   params,
@@ -24,6 +39,13 @@ export default async function MovieDetailPage({
   const movie = supabase ? await fetchMovieDetail(supabase, id) : null;
 
   if (!movie) notFound();
+
+  const [videos, watchProviders] = supabase
+    ? await Promise.all([
+        fetchContentVideos(supabase, movie.id),
+        fetchContentWatchProviders(supabase, movie.id),
+      ])
+    : [[], []];
 
   const genreNames = movie.content_genre.map((cg) => cg.genre?.name).filter(Boolean);
   const releaseYear = movie.release_date?.slice(0, 4);
@@ -156,31 +178,68 @@ export default async function MovieDetailPage({
           <div className="detail-grid">
             <div className="card panel">
               <h3>회차 및 부가 영상</h3>
-              <div className="episodes">
-                <div className="episode">
-                  <b>공식 예고편</b>
-                  <span>02:14 · YouTube</span>
+              {videos.length > 0 ? (
+                <div className="episodes">
+                  {videos.map((video) => (
+                    <a
+                      key={video.id}
+                      className="episode"
+                      href={video.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ textDecoration: "none" }}
+                    >
+                      <b>{video.title}</b>
+                      <span>
+                        {VIDEO_TYPE_LABELS[video.video_type] ?? video.video_type}
+                        {video.provider_label ? ` · ${video.provider_label}` : ""}
+                      </span>
+                    </a>
+                  ))}
                 </div>
-                <div className="episode">
-                  <b>감독 인터뷰</b>
-                  <span>08:32 · 공식 채널</span>
-                </div>
-                <div className="episode">
-                  <b>OST 플레이리스트</b>
-                  <span>12곡 · YouTube Music</span>
-                </div>
-              </div>
+              ) : (
+                <p className="muted">아직 등록된 영상이 없어요.</p>
+              )}
             </div>
             <div className="card panel">
               <h3>볼 수 있는 곳</h3>
-              <div className="providers">
-                <div className="provider">CGV</div>
-                <div className="provider tone-2">WATCHA</div>
-                <div className="provider tone-3">NETFLIX</div>
-              </div>
-              <p className="sub" style={{ marginTop: 15 }}>
-                제공 정보는 지역과 시점에 따라 달라질 수 있어요.
-              </p>
+              {watchProviders.length > 0 ? (
+                <>
+                  <div className="providers">
+                    {watchProviders.map((wp, i) => {
+                      const label = wp.provider?.name ?? "정보 없음";
+                      const content = (
+                        <>
+                          {label}
+                          {PROVIDER_TYPE_LABELS[wp.type] ? ` (${PROVIDER_TYPE_LABELS[wp.type]})` : ""}
+                        </>
+                      );
+                      const toneClass = i % 3 === 1 ? " tone-2" : i % 3 === 2 ? " tone-3" : "";
+                      return wp.url ? (
+                        <a
+                          key={`${wp.provider?.name}-${wp.type}`}
+                          className={`provider${toneClass}`}
+                          href={wp.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ textDecoration: "none" }}
+                        >
+                          {content}
+                        </a>
+                      ) : (
+                        <div key={`${wp.provider?.name}-${wp.type}`} className={`provider${toneClass}`}>
+                          {content}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="sub" style={{ marginTop: 15 }}>
+                    제공 정보는 지역과 시점에 따라 달라질 수 있어요.
+                  </p>
+                </>
+              ) : (
+                <p className="muted">아직 등록된 시청처 정보가 없어요.</p>
+              )}
             </div>
           </div>
         </div>

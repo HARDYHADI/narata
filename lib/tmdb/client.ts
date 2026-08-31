@@ -124,3 +124,47 @@ export async function fetchMovieCredits(id: number) {
 export async function fetchMovieReleaseDates(id: number) {
   return tmdbFetch<TmdbReleaseDatesResponse>(`/movie/${id}/release_dates`);
 }
+
+export interface TmdbVideo {
+  id: string;
+  key: string;
+  name: string;
+  site: string;
+  type: string;
+  official: boolean;
+  published_at: string;
+}
+
+export interface TmdbVideosResponse {
+  results: TmdbVideo[];
+}
+
+export async function fetchMovieVideos(id: number) {
+  // TMDB filters /videos strictly by `language`, and most YouTube trailers are
+  // tagged "en" rather than "ko" — include_video_language broadens the match
+  // so we don't lose real videos while still preferring Korean-tagged ones.
+  return tmdbFetch<TmdbVideosResponse>(`/movie/${id}/videos`, {
+    language: "ko-KR",
+    include_video_language: "ko,en,null",
+  });
+}
+
+export interface TmdbWatchProviderEntry {
+  provider_name: string;
+  logo_path: string | null;
+}
+
+export interface TmdbWatchProviderRegion {
+  link?: string;
+  flatrate?: TmdbWatchProviderEntry[];
+  rent?: TmdbWatchProviderEntry[];
+  buy?: TmdbWatchProviderEntry[];
+}
+
+export interface TmdbWatchProvidersResponse {
+  results: Record<string, TmdbWatchProviderRegion>;
+}
+
+export async function fetchMovieWatchProviders(id: number) {
+  return tmdbFetch<TmdbWatchProvidersResponse>(`/movie/${id}/watch/providers`);
+}
