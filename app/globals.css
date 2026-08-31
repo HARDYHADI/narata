@@ -483,13 +483,15 @@ a {
 .moviebar-row b {
   font-size: 20px;
 }
-.moviebar-row a {
+.moviebar-row a,
+.moviebar-row span {
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
   color: rgba(255, 255, 255, 0.72);
 }
-.moviebar-row a.on {
+.moviebar-row a.on,
+.moviebar-row span.on {
   color: var(--orange);
   font-weight: 900;
 }
@@ -1395,6 +1397,150 @@ a {
   font-size: 12px;
 }
 
+/* category home pages (drama/anime/comics/webtoons/webnovels) */
+.listrow {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.listrow:first-of-type {
+  border: 0;
+}
+.listrow b {
+  color: var(--orange);
+}
+.rank .listrow {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.rank .listrow span {
+  color: white;
+}
+.weekday {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.day {
+  padding: 13px 8px;
+  border-radius: 12px;
+  background: var(--soft);
+  min-height: 112px;
+}
+.day b {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.day span {
+  display: block;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.day.today {
+  background: var(--pine);
+  color: white;
+}
+.day.today span {
+  color: rgba(255, 255, 255, 0.7);
+}
+.platforms {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.platform {
+  height: 38px;
+  padding: 0 13px;
+  border-radius: 10px;
+  background: var(--green);
+  color: white;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+.platform:nth-child(even) {
+  background: var(--orange);
+  color: var(--pine);
+}
+.shelf {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+.book {
+  height: 185px;
+  border-radius: 8px 15px 15px 8px;
+  background: var(--green);
+  color: white;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-left: 7px solid var(--pine);
+  box-shadow: 6px 8px 18px rgba(6, 53, 50, 0.1);
+}
+.book:nth-child(even) {
+  background: var(--orange);
+  color: var(--pine);
+  border-color: #b86213;
+}
+.book small {
+  font-size: 10px;
+}
+.book b {
+  font-size: 17px;
+  line-height: 1.3;
+}
+.schedule {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+.episode {
+  height: 125px;
+  border-radius: 14px;
+  background: var(--soft);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.episode b {
+  font-size: 15px;
+}
+.episode span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chip {
+  height: 35px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--soft);
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 900;
+  border: 0;
+  cursor: pointer;
+}
+.chip.on {
+  background: var(--pine);
+  color: white;
+}
+
 @media (max-width: 960px) {
   .hero,
   .home-lower,
@@ -1423,5 +1569,10 @@ a {
   .board-row .views,
   .board-row .likes {
     display: none;
+  }
+  .weekday,
+  .shelf,
+  .schedule {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
