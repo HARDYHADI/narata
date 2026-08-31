@@ -3,11 +3,11 @@ import SiteFooter from "@/components/site-footer";
 
 const CONTENT_NAV = [
   { label: "영화", href: "/movies" },
-  { label: "드라마", href: "/movies" },
-  { label: "애니", href: "/movies" },
-  { label: "만화", href: "/movies" },
-  { label: "웹툰", href: "/movies" },
-  { label: "웹소설", href: "/movies" },
+  { label: "드라마", href: "/dramas" },
+  { label: "애니", href: "/anime" },
+  { label: "만화", href: "/comics" },
+  { label: "웹툰", href: "/webtoons" },
+  { label: "웹소설", href: "/webnovels" },
 ];
 
 const HERO_GENRES = [
