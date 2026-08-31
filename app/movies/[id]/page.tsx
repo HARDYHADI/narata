@@ -6,6 +6,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchMovieDetail } from "@/lib/movies/queries";
 import { fetchContentVideos, fetchContentWatchProviders } from "@/lib/movies/media";
 import { formatCountry, formatRuntime, formatStatus } from "@/lib/movies/format";
+import RatingWidget from "@/components/reviews/rating-widget";
 
 export const revalidate = 60;
 
@@ -137,10 +138,29 @@ export default async function MovieDetailPage({
                 아직 평점 정보가 없어요.
               </div>
             )}
-            <div className="muted" style={{ fontSize: 12, marginTop: 16 }}>
-              나라타 자체 평점은 아직 준비 중이에요.
+            <div className="eyebrow" style={{ marginTop: 20 }}>
+              나라타 평점
             </div>
-            <button className="btn orange ratebtn">내 별점 남기기</button>
+            {movie.rating_count > 0 ? (
+              <>
+                <div className="scoretop">
+                  <strong>{movie.average_rating.toFixed(1)}</strong>
+                  <span className="muted">/ 5</span>
+                </div>
+                <div className="stars" style={{ fontSize: 22, marginTop: 8 }}>
+                  {"★".repeat(Math.round(movie.average_rating))}
+                  {"☆".repeat(5 - Math.round(movie.average_rating))}
+                </div>
+                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                  {movie.rating_count.toLocaleString()}명 참여
+                </div>
+              </>
+            ) : (
+              <div className="muted" style={{ marginTop: 8 }}>
+                아직 나라타 평점이 없어요. 첫 별점을 남겨보세요.
+              </div>
+            )}
+            <RatingWidget contentId={movie.id} />
           </aside>
         </div>
 

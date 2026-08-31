@@ -166,6 +166,8 @@ export interface MovieDetail {
   poster_url: string | null;
   external_rating: number | null;
   external_rating_count: number | null;
+  average_rating: number;
+  rating_count: number;
   director: string | null;
   cast_names: string[] | null;
   age_rating: string | null;
@@ -173,7 +175,7 @@ export interface MovieDetail {
 }
 
 const MOVIE_DETAIL_SELECT =
-  "id, canonical_title, original_title, synopsis_short, release_date, status, country_code, original_language, runtime_minutes, poster_url, external_rating, external_rating_count, director, cast_names, age_rating, content_genre(genre(name))";
+  "id, canonical_title, original_title, synopsis_short, release_date, status, country_code, original_language, runtime_minutes, poster_url, external_rating, external_rating_count, average_rating, rating_count, director, cast_names, age_rating, content_genre(genre(name))";
 
 export async function fetchMovieDetail(
   supabase: SupabaseClient,

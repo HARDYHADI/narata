@@ -1,53 +1,21 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
+import WriteBox from "@/components/reviews/write-box";
+import TagCloud from "@/components/reviews/tag-cloud";
+import ReviewList from "@/components/reviews/review-list";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { fetchMovieDetail } from "@/lib/movies/queries";
+import {
+  fetchRatingSummary,
+  fetchReviews,
+  fetchContentTags,
+  fetchContentTagVotePercentages,
+  type TagVotePercentage,
+} from "@/lib/reviews/queries";
 
-const DISTRIBUTION = [
-  { label: "5", pct: 78 },
-  { label: "4", pct: 51 },
-  { label: "3", pct: 21 },
-  { label: "2", pct: 8 },
-  { label: "1", pct: 4 },
-];
-
-const TAGS = [
-  { label: "여운이 길어요 81%", on: true },
-  { label: "촬영이 아름다워요 76%", on: true },
-  { label: "음향이 인상적이에요 69%" },
-  { label: "전개가 느려요 52%" },
-  { label: "해석이 필요해요 48%" },
-  { label: "두 번 보고 싶어요 41%" },
-];
-
-const REVIEWS = [
-  {
-    user: "파도타기",
-    rating: "5.0",
-    time: "2시간 전",
-    body: "말보다 소리와 빈 공간이 더 많은 영화. 마지막 장면을 보고 처음부터 다시 떠올리게 되는 구조가 좋았다. 느린 영화에 익숙하지 않다면 초반은 조금 버거울 수 있음.",
-    helpful: 328,
-    comments: 42,
-    spoiler: false,
-  },
-  {
-    user: "늦은극장",
-    rating: "4.5",
-    time: "어제",
-    body: "결말의 파도 방향이 앞 장면과 반대라는 걸 알고 나면 아버지의 기록을 다르게 보게 된다.",
-    helpful: 211,
-    comments: 31,
-    spoiler: true,
-  },
-  {
-    user: "섬마을",
-    rating: "4.0",
-    time: "3일 전",
-    body: "촬영과 음향은 정말 좋은데 인물의 선택을 설명하지 않는 부분이 많다. 해석하는 재미를 좋아하면 추천.",
-    helpful: 96,
-    comments: 12,
-    spoiler: false,
-  },
-];
+export const revalidate = 60;
 
 export default async function MovieReviewsPage({
   params,
@@ -55,6 +23,32 @@ export default async function MovieReviewsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const supabase = getSupabaseClient();
+  if (!supabase) notFound();
+
+  const movie = await fetchMovieDetail(supabase, id);
+  if (!movie) notFound();
+
+  const [summary, reviews, moodTags, tagVotes] = await Promise.all([
+    fetchRatingSummary(supabase, id),
+    fetchReviews(supabase, id, "helpful"),
+    fetchContentTags(supabase, "MOOD"),
+    fetchContentTagVotePercentages(supabase, id),
+  ]);
+
+  const tagCloudInitial: TagVotePercentage[] = moodTags.map((tag) => {
+    const voted = tagVotes.find((v) => v.tag_id === tag.id);
+    return {
+      tag_id: tag.id,
+      name: tag.name,
+      category: tag.category,
+      kind: tag.kind,
+      votes: voted?.votes ?? 0,
+      percentage: voted?.percentage ?? 0,
+    };
+  });
+
+  const roundedAverage = Math.round(summary.average);
 
   return (
     <>
@@ -63,11 +57,13 @@ export default async function MovieReviewsPage({
       <div className="wrap">
         <div className="page-title">
           <div>
-            <span className="eyebrow">검은 파도의 밤</span>
+            <span className="eyebrow">{movie.canonical_title}</span>
             <h1>평점과 리뷰</h1>
             <p>별점 분포, 취향별 평가와 스포일러 리뷰를 확인하세요.</p>
           </div>
-          <button className="btn orange">내 리뷰 작성</button>
+          <a href="#write-box" className="btn orange">
+            내 리뷰 작성
+          </a>
         </div>
 
         <nav className="detail-tabs">
@@ -83,16 +79,17 @@ export default async function MovieReviewsPage({
             <div className="card rating-card">
               <span className="eyebrow">평균 평점</span>
               <div className="bignum" style={{ fontSize: 47, fontWeight: 900 }}>
-                4.6
+                {summary.average.toFixed(1)}
               </div>
               <div className="stars" style={{ fontSize: 21 }}>
-                ★★★★★
+                {"★".repeat(roundedAverage)}
+                {"☆".repeat(5 - roundedAverage)}
               </div>
-              <div className="sub">12,842명 참여</div>
+              <div className="sub">{summary.count.toLocaleString()}명 참여</div>
               <div className="bars" style={{ textAlign: "left" }}>
-                {DISTRIBUTION.map((d) => (
-                  <div key={d.label} className="bar">
-                    <span>{d.label}</span>
+                {summary.distribution.map((d) => (
+                  <div key={d.star} className="bar">
+                    <span>{d.star}</span>
                     <i style={{ ["--w" as string]: `${d.pct}%` }} />
                     <small>{d.pct}%</small>
                   </div>
@@ -103,13 +100,7 @@ export default async function MovieReviewsPage({
             <div className="card review-stats">
               <h2>리뷰에서 자주 언급된 요소</h2>
               <div className="sub">리뷰와 선택형 태그를 함께 분석했어요.</div>
-              <div className="tag-cloud">
-                {TAGS.map((tag) => (
-                  <span key={tag.label} className={`pill${tag.on ? " on" : ""}`}>
-                    {tag.label}
-                  </span>
-                ))}
-              </div>
+              <TagCloud contentId={id} initialTags={tagCloudInitial} />
               <h3 style={{ marginTop: 25 }}>내 취향과의 일치</h3>
               <p className="synopsis">
                 지우님이 높게 평가한 ‘서정적 미스터리’, ‘가족의 비밀’, ‘여운 있는 결말’ 요소와 강하게
@@ -119,52 +110,9 @@ export default async function MovieReviewsPage({
             </div>
           </div>
 
-          <div className="card write-box">
-            <div>
-              <b>이 작품을 어떻게 보셨나요?</b>
-              <div className="sub">별점과 짧은 감상을 남기면 추천이 더 정교해져요.</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span className="stars" style={{ fontSize: 25 }}>
-                ☆☆☆☆☆
-              </span>
-              <button className="btn orange">리뷰 작성</button>
-            </div>
-          </div>
+          <WriteBox contentId={id} />
 
-          <div className="card review-list">
-            <div style={{ padding: 22, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-              <b>리뷰 3,821개</b>
-              <div className="tabs">
-                <button className="tab on">추천순</button>
-                <button className="tab">최신순</button>
-                <button className="tab">내 취향순</button>
-              </div>
-            </div>
-            {REVIEWS.map((r) => (
-              <article key={r.user} className="review-item">
-                <div className="review-head">
-                  <b>
-                    {r.user} <span className="stars">★ {r.rating}</span>
-                  </b>
-                  <span className="sub">{r.time}</span>
-                </div>
-                <p>
-                  {r.spoiler && (
-                    <span className="pill orange" style={{ marginRight: 8 }}>
-                      스포일러 포함
-                    </span>
-                  )}
-                  {r.body}
-                </p>
-                <div className="reaction">
-                  <span>도움돼요 {r.helpful}</span>
-                  <span>댓글 {r.comments}</span>
-                  <span>신고</span>
-                </div>
-              </article>
-            ))}
-          </div>
+          <ReviewList contentId={id} initialReviews={reviews} />
         </div>
       </div>
 
