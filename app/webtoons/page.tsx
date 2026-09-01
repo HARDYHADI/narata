@@ -1,6 +1,7 @@
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import CategoryBar from "@/components/category-bar";
+import AuthStatus from "@/components/auth-status";
 
 // NOTE: no WEBTOON content has been ingested yet (only TMDB movies so far),
 // so this page renders the approved static sample design until a webtoon
@@ -48,7 +49,7 @@ export default function WebtoonsPage() {
         actions={
           <>
             <button className="btn orange">AI 찾기</button>
-            <button className="btn">로그인</button>
+            <AuthStatus />
           </>
         }
       />

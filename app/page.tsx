@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SiteFooter from "@/components/site-footer";
+import AuthStatus from "@/components/auth-status";
 
 const CONTENT_NAV = [
   { label: "영화", href: "/movies" },
@@ -71,7 +72,7 @@ export default function Home() {
           <Link href="/ai" className="btn orange">
             AI 찾기
           </Link>
-          <button className="btn">로그인</button>
+          <AuthStatus />
         </div>
       </header>
 

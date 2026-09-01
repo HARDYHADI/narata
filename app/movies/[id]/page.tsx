@@ -10,6 +10,7 @@ import RatingWidget from "@/components/reviews/rating-widget";
 import WatchlistButton from "@/components/watchlist-button";
 import CollectionPickerButton from "@/components/collection-picker-button";
 import MovieQaBox from "@/components/movie-qa-box";
+import AuthStatus from "@/components/auth-status";
 
 export const revalidate = 60;
 
@@ -61,7 +62,7 @@ export default async function MovieDetailPage({
       <SiteHeader
         active="content"
         searchPlaceholder="작품 안에서 검색"
-        actions={<button className="btn">내 프로필</button>}
+        actions={<AuthStatus />}
       />
 
       <div className="wrap">

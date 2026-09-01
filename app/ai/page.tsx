@@ -1,5 +1,6 @@
 import SiteHeader from "@/components/site-header";
 import AiSearch from "@/components/ai-search";
+import AuthStatus from "@/components/auth-status";
 
 export default function AiFindPage() {
   return (
@@ -9,7 +10,7 @@ export default function AiFindPage() {
         actions={
           <>
             <button className="btn ghost">이전 질문</button>
-            <button className="btn">내 프로필</button>
+            <AuthStatus />
           </>
         }
       />

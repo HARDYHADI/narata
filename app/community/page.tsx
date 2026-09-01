@@ -1,6 +1,7 @@
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import FeedBoard from "@/components/community/feed-board";
+import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchCommunityFeed, fetchTrendingGalleries } from "@/lib/community/queries";
 
@@ -14,7 +15,7 @@ export default async function CommunityPage() {
 
   return (
     <>
-      <SiteHeader active="community" searchPlaceholder="갤러리·게시글 검색" actions={<button className="btn">로그인</button>} />
+      <SiteHeader active="community" searchPlaceholder="갤러리·게시글 검색" actions={<AuthStatus />} />
 
       <div className="wrap">
         <div className="page-title">
