@@ -10,14 +10,21 @@ import {
   TMDB_IMAGE_BASE_URL,
   type TmdbPageFetcher,
   type TmdbVideo,
+  type TmdbWatchProvidersResponse,
 } from "../tmdb/client";
 import { mapTmdbMovieToContent } from "../tmdb/mapToContent";
 import { createEmbedding, EMBEDDING_MODEL } from "../embeddings/openai";
 import { buildWorkSummaryChunkText } from "../embeddings/buildWorkSummaryChunk";
 
+// Movie TMDB ids and TV TMDB ids are separate id spaces — a movie and a TV
+// show can share the same numeric id. Keep this exact value untouched (it's
+// matched against 100+ already-ingested movies via external_identifier on
+// every re-ingestion run); TV ingestion uses its own distinct source value
+// (see TMDB_TV_SOURCE in ingestTmdbTv.ts) so the two never collide.
 const TMDB_SOURCE = "tmdb";
 
-async function upsertGenres(supabase: SupabaseClient, genreNames: string[]) {
+// Shared across movie and TV ingestion (see ingestTmdbTv.ts).
+export async function upsertGenres(supabase: SupabaseClient, genreNames: string[]) {
   if (genreNames.length === 0) return new Map<string, string>();
 
   const { data, error } = await supabase
@@ -54,7 +61,8 @@ function mapTmdbVideoType(video: TmdbVideo): ContentVideoType {
   }
 }
 
-function buildContentVideoRows(contentId: string, videos: TmdbVideo[]) {
+// Shared across movie and TV ingestion (see ingestTmdbTv.ts).
+export function buildContentVideoRows(contentId: string, videos: TmdbVideo[]) {
   return videos
     .filter((v) => v.site === "YouTube")
     .map((v) => ({
@@ -70,21 +78,23 @@ function buildContentVideoRows(contentId: string, videos: TmdbVideo[]) {
 
 type WatchProviderRegionType = "STREAMING" | "RENT" | "BUY";
 
-interface KrWatchProviderEntry {
+// Shared across movie and TV ingestion (see ingestTmdbTv.ts).
+export interface KrWatchProviderEntry {
   provider_name: string;
   type: WatchProviderRegionType;
   logo_path: string | null;
 }
 
-const WATCH_PROVIDER_REGION = "KR";
+// Shared across movie and TV ingestion (see ingestTmdbTv.ts).
+export const WATCH_PROVIDER_REGION = "KR";
 const WATCH_PROVIDER_LIST_TYPES: Array<["flatrate" | "rent" | "buy", WatchProviderRegionType]> = [
   ["flatrate", "STREAMING"],
   ["rent", "RENT"],
   ["buy", "BUY"],
 ];
 
-function collectKrWatchProviderEntries(
-  watchProviders: Awaited<ReturnType<typeof fetchMovieWatchProviders>>
+export function collectKrWatchProviderEntries(
+  watchProviders: TmdbWatchProvidersResponse
 ): { entries: KrWatchProviderEntry[]; link: string | null } {
   const kr = watchProviders.results[WATCH_PROVIDER_REGION];
   if (!kr) return { entries: [], link: null };
@@ -99,7 +109,8 @@ function collectKrWatchProviderEntries(
   return { entries, link: kr.link ?? null };
 }
 
-async function upsertWatchProviders(
+// Shared across movie and TV ingestion (see ingestTmdbTv.ts).
+export async function upsertWatchProviders(
   supabase: SupabaseClient,
   entries: KrWatchProviderEntry[]
 ) {
@@ -127,11 +138,18 @@ async function upsertWatchProviders(
   return new Map((data ?? []).map((p) => [p.name as string, p.id as string]));
 }
 
-async function findExistingContentId(supabase: SupabaseClient, tmdbId: number) {
+// Shared across movie and TV ingestion (see ingestTmdbTv.ts). `source` must
+// be distinct per external id space (movies use TMDB_SOURCE = "tmdb", TV
+// uses its own TMDB_TV_SOURCE) — TMDB movie and TV ids can collide numerically.
+export async function findExistingContentId(
+  supabase: SupabaseClient,
+  source: string,
+  tmdbId: number
+) {
   const { data, error } = await supabase
     .from("external_identifier")
     .select("content_id")
-    .eq("source", TMDB_SOURCE)
+    .eq("source", source)
     .eq("external_id", String(tmdbId))
     .maybeSingle();
 
@@ -151,7 +169,7 @@ async function ingestMovie(supabase: SupabaseClient, tmdbId: number) {
   const genreNames = movie.genres.map((g) => g.name);
   const genreMap = await upsertGenres(supabase, genreNames);
 
-  const existingContentId = await findExistingContentId(supabase, tmdbId);
+  const existingContentId = await findExistingContentId(supabase, TMDB_SOURCE, tmdbId);
   let contentId: string;
 
   if (existingContentId) {
@@ -295,7 +313,28 @@ export function serializeError(error: unknown): string {
   return String(error);
 }
 
-const INGEST_CONCURRENCY = 8;
+// Shared across movie and TV ingestion (see ingestTmdbTv.ts).
+export const INGEST_CONCURRENCY = 8;
+
+/**
+ * Runs `ingestOneFn` over `tmdbIds` in fixed-size concurrent batches,
+ * collecting per-id results (including per-id errors, which don't abort
+ * the batch). Shared by movie and TV ingestion (see ingestTmdbTv.ts).
+ */
+export async function runIngestionInBatches(
+  tmdbIds: number[],
+  ingestOneFn: (tmdbId: number) => Promise<IngestResult>
+): Promise<IngestResult[]> {
+  const results: IngestResult[] = [];
+
+  for (let i = 0; i < tmdbIds.length; i += INGEST_CONCURRENCY) {
+    const batch = tmdbIds.slice(i, i + INGEST_CONCURRENCY);
+    const batchResults = await Promise.all(batch.map(ingestOneFn));
+    results.push(...batchResults);
+  }
+
+  return results;
+}
 
 async function ingestOne(supabase: SupabaseClient, tmdbId: number): Promise<IngestResult> {
   try {
@@ -314,17 +353,10 @@ export async function runTmdbIngestion(
   const listPage = await fetchPage(page);
   const movies = listPage.results.slice(0, limit);
 
-  const results: IngestResult[] = [];
-
-  for (let i = 0; i < movies.length; i += INGEST_CONCURRENCY) {
-    const batch = movies.slice(i, i + INGEST_CONCURRENCY);
-    const batchResults = await Promise.all(
-      batch.map((movie) => ingestOne(supabase, movie.id))
-    );
-    results.push(...batchResults);
-  }
-
-  return results;
+  return runIngestionInBatches(
+    movies.map((movie) => movie.id),
+    (tmdbId) => ingestOne(supabase, tmdbId)
+  );
 }
 
 export async function runTmdbPopularIngestion(
@@ -343,15 +375,17 @@ export interface BackfillSummary {
   results: IngestResult[];
 }
 
-const DEFAULT_BACKFILL_DEADLINE_MS = 45_000;
+export const DEFAULT_BACKFILL_DEADLINE_MS = 45_000;
 
 /**
- * Ingests multiple pages from a TMDB list source in one call, stopping
- * before the Vercel function timeout if the full range won't fit.
- * `nextPage` in the response tells the caller where to resume.
+ * Runs `runPage(page, limit)` for consecutive pages starting at `startPage`,
+ * stopping before the Vercel function timeout if the full range won't fit.
+ * `nextPage` in the response tells the caller where to resume. Shared by
+ * movie and TV backfill (see ingestTmdbTv.ts) — each just supplies its own
+ * per-page ingestion function.
  */
-export async function runTmdbBackfillFromSource(
-  fetchPage: TmdbPageFetcher,
+export async function runBackfillLoop(
+  runPage: (page: number, limit: number) => Promise<IngestResult[]>,
   startPage: number,
   pageCount: number,
   limit: number,
@@ -363,7 +397,7 @@ export async function runTmdbBackfillFromSource(
   let page = startPage;
 
   for (; page < startPage + pageCount; page++) {
-    const pageResults = await runTmdbIngestion(fetchPage, page, limit);
+    const pageResults = await runPage(page, limit);
     results.push(...pageResults);
     completedPages++;
 
@@ -382,6 +416,27 @@ export async function runTmdbBackfillFromSource(
     nextPage,
     results,
   };
+}
+
+/**
+ * Ingests multiple pages from a TMDB movie list source in one call, stopping
+ * before the Vercel function timeout if the full range won't fit.
+ * `nextPage` in the response tells the caller where to resume.
+ */
+export async function runTmdbBackfillFromSource(
+  fetchPage: TmdbPageFetcher,
+  startPage: number,
+  pageCount: number,
+  limit: number,
+  deadlineMs = DEFAULT_BACKFILL_DEADLINE_MS
+): Promise<BackfillSummary> {
+  return runBackfillLoop(
+    (page, lim) => runTmdbIngestion(fetchPage, page, lim),
+    startPage,
+    pageCount,
+    limit,
+    deadlineMs
+  );
 }
 
 export async function runTmdbBackfill(

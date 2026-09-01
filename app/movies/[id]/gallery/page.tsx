@@ -63,7 +63,7 @@ export default async function MovieGalleryPage({
       <div className="wrap">
         <div className="page-title">
           <div>
-            <span className="eyebrow">MOVIE GALLERY</span>
+            <span className="eyebrow">{movie.content_type} GALLERY</span>
             <h1>{movie.canonical_title} 갤러리</h1>
             <p>
               게시글 {(gallery?.post_count ?? 0).toLocaleString()}개
