@@ -5,8 +5,8 @@ type MovieBarKey = "home" | "browse" | "now" | "upcoming" | "ranking" | "collect
 const MOVIE_BAR_ITEMS: { key: MovieBarKey; label: string; href: string }[] = [
   { key: "home", label: "영화 홈", href: "/movies/home" },
   { key: "browse", label: "전체 영화", href: "/movies" },
-  { key: "now", label: "상영 중", href: "/movies?status=now" },
-  { key: "upcoming", label: "공개 예정", href: "/movies?status=upcoming" },
+  { key: "now", label: "상영 중", href: "/movies?status=COMPLETED" },
+  { key: "upcoming", label: "공개 예정", href: "/movies?status=UPCOMING" },
   { key: "ranking", label: "평점 순위", href: "/movies?sort=rating" },
   { key: "collection", label: "컬렉션", href: "/movies?view=collection" },
 ];

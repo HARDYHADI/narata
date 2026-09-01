@@ -4,6 +4,7 @@ import SiteFooter from "@/components/site-footer";
 import MovieBar from "@/components/movie-bar";
 import MovieInfiniteGrid from "@/components/movie-infinite-grid";
 import WatchlistView from "@/components/watchlist-view";
+import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import {
   fetchFilteredMoviePage,
@@ -86,7 +87,7 @@ export default async function MoviesPage({
               <Link href="/ai" className="btn orange">
                 AI 찾기
               </Link>
-              <button className="btn">로그인</button>
+              <AuthStatus />
             </>
           }
         />
@@ -150,7 +151,7 @@ export default async function MoviesPage({
             <Link href="/ai" className="btn orange">
               AI 찾기
             </Link>
-            <button className="btn">로그인</button>
+            <AuthStatus />
           </>
         }
       />

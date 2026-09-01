@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import MovieBar from "@/components/movie-bar";
+import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { searchMovies } from "@/lib/movies/queries";
 
@@ -20,7 +21,7 @@ export default async function MovieSearchPage({
 
   return (
     <>
-      <SiteHeader active="content" actions={<button className="btn">로그인</button>} />
+      <SiteHeader active="content" actions={<AuthStatus />} />
       <MovieBar active="browse" />
 
       <div className="wrap">

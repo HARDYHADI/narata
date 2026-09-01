@@ -3,6 +3,7 @@ import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import MovieBar from "@/components/movie-bar";
 import MovieCard from "@/components/movie-card";
+import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchRecentMovies } from "@/lib/movies/queries";
 
@@ -40,7 +41,7 @@ export default async function MovieHomePage() {
             <Link href="/ai" className="btn orange">
               AI 찾기
             </Link>
-            <button className="btn">로그인</button>
+            <AuthStatus />
           </>
         }
       />

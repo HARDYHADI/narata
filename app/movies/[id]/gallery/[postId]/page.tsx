@@ -5,6 +5,7 @@ import SiteFooter from "@/components/site-footer";
 import LikeButton from "@/components/community/like-button";
 import ReportButton from "@/components/community/report-button";
 import CommentSection from "@/components/community/comment-section";
+import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchMovieDetail } from "@/lib/movies/queries";
 import { fetchPost, fetchGallery, fetchPostComments, recordPostView } from "@/lib/community/queries";
@@ -39,7 +40,7 @@ export default async function PostDetailPage({
 
   return (
     <>
-      <SiteHeader active="content" actions={<button className="btn">로그인</button>} />
+      <SiteHeader active="content" actions={<AuthStatus />} />
       <div className="moviebar">
         <div className="wrap moviebar-row">
           <b>{movie.canonical_title} 갤러리</b>

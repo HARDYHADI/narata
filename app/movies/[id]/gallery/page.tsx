@@ -3,6 +3,7 @@ import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import PostBoard from "@/components/community/post-board";
 import PostWriteBox from "@/components/community/post-write-box";
+import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchMovieDetail } from "@/lib/movies/queries";
 import {
@@ -49,7 +50,7 @@ export default async function MovieGalleryPage({
             <a href="#write-box" className="btn orange">
               글쓰기
             </a>
-            <button className="btn">로그인</button>
+            <AuthStatus />
           </>
         }
       />

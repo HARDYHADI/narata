@@ -5,6 +5,7 @@ import SiteFooter from "@/components/site-footer";
 import WriteBox from "@/components/reviews/write-box";
 import TagCloud from "@/components/reviews/tag-cloud";
 import ReviewList from "@/components/reviews/review-list";
+import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchMovieDetail } from "@/lib/movies/queries";
 import {
@@ -52,7 +53,7 @@ export default async function MovieReviewsPage({
 
   return (
     <>
-      <SiteHeader active="content" actions={<button className="btn">내 프로필</button>} />
+      <SiteHeader active="content" actions={<AuthStatus />} />
 
       <div className="wrap">
         <div className="page-title">
