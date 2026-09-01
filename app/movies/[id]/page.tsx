@@ -5,7 +5,12 @@ import SiteFooter from "@/components/site-footer";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchMovieDetail } from "@/lib/movies/queries";
 import { fetchContentVideos, fetchContentWatchProviders } from "@/lib/movies/media";
-import { formatCountry, formatRuntime, formatStatus } from "@/lib/movies/format";
+import {
+  formatCountry,
+  formatRuntime,
+  formatStatus,
+  formatContentTypeLabel,
+} from "@/lib/movies/format";
 import RatingWidget from "@/components/reviews/rating-widget";
 import WatchlistButton from "@/components/watchlist-button";
 import CollectionPickerButton from "@/components/collection-picker-button";
@@ -14,6 +19,12 @@ import AuthStatus from "@/components/auth-status";
 
 export const revalidate = 60;
 
+// NOTE: this route also serves as the detail page for DRAMA and ANIME
+// content (fetchMovieDetail fetches by id regardless of content_type) —
+// the URL segment stays "/movies/{id}" for all content types deliberately,
+// to avoid a larger route-renaming refactor right now. Copy below branches
+// on movie.content_type where it matters (see formatContentTypeLabel).
+//
 // NOTE: related works and gallery/review activity aren't backed by real
 // data yet (no community tables). Those sections stay as static sample
 // content from the approved design until that schema exists.
@@ -56,6 +67,7 @@ export default async function MovieDetailPage({
   const country = formatCountry(movie.country_code);
   const runtime = formatRuntime(movie.runtime_minutes);
   const subLine = [movie.original_title, country, runtime].filter(Boolean).join(" · ");
+  const contentTypeLabel = formatContentTypeLabel(movie.content_type);
 
   return (
     <>
@@ -77,7 +89,7 @@ export default async function MovieDetailPage({
               />
             ) : (
               <>
-                <small>MOVIE</small>
+                <small>{movie.content_type}</small>
                 <strong>{movie.canonical_title}</strong>
                 <small>{movie.original_title ?? ""}</small>
               </>
@@ -85,7 +97,7 @@ export default async function MovieDetailPage({
           </div>
           <div className="detail-copy">
             <span className="eyebrow">
-              영화{releaseYear ? ` · ${releaseYear}` : ""}
+              {contentTypeLabel}{releaseYear ? ` · ${releaseYear}` : ""}
             </span>
             <h1>{movie.canonical_title}</h1>
             {subLine && <div className="original">{subLine}</div>}

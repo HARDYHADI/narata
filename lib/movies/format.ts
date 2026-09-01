@@ -35,3 +35,16 @@ const STATUS_LABELS: Record<string, string> = {
 export function formatStatus(status: string): string {
   return STATUS_LABELS[status] ?? status;
 }
+
+// /movies/[id] doubles as the generic content detail page (movies, dramas,
+// and anime all live at that URL — see the NOTE in that route), so its copy
+// needs to branch on content_type instead of hardcoding "영화".
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  MOVIE: "영화",
+  DRAMA: "드라마",
+  ANIME: "애니메이션",
+};
+
+export function formatContentTypeLabel(contentType: string): string {
+  return CONTENT_TYPE_LABELS[contentType] ?? "영화";
+}
