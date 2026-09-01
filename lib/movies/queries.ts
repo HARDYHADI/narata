@@ -17,7 +17,8 @@ const MOVIE_LIST_SELECT =
 
 export async function fetchMoviePage(
   supabase: SupabaseClient,
-  page: number
+  page: number,
+  contentType: string = "MOVIE"
 ): Promise<MovieListItem[]> {
   const from = page * MOVIE_PAGE_SIZE;
   const to = from + MOVIE_PAGE_SIZE - 1;
@@ -25,7 +26,7 @@ export async function fetchMoviePage(
   const { data, error } = await supabase
     .from("content")
     .select(MOVIE_LIST_SELECT)
-    .eq("content_type", "MOVIE")
+    .eq("content_type", contentType)
     .order("release_date", { ascending: false, nullsFirst: false })
     .order("id", { ascending: false })
     .range(from, to);
@@ -86,12 +87,13 @@ async function resolveGenreContentIds(
 export async function fetchFilteredMoviePage(
   supabase: SupabaseClient,
   page: number,
-  filters: MovieFilterParams = {}
+  filters: MovieFilterParams = {},
+  contentType: string = "MOVIE"
 ): Promise<MovieListItem[]> {
   const from = page * MOVIE_PAGE_SIZE;
   const to = from + MOVIE_PAGE_SIZE - 1;
 
-  let query = supabase.from("content").select(MOVIE_LIST_SELECT).eq("content_type", "MOVIE");
+  let query = supabase.from("content").select(MOVIE_LIST_SELECT).eq("content_type", contentType);
 
   if (filters.genreIds && filters.genreIds.length > 0) {
     const contentIds = await resolveGenreContentIds(supabase, filters.genreIds);
@@ -135,12 +137,13 @@ export async function fetchFilteredMoviePage(
 
 export async function fetchRecentMovies(
   supabase: SupabaseClient,
-  limit: number
+  limit: number,
+  contentType: string = "MOVIE"
 ): Promise<MovieListItem[]> {
   const { data, error } = await supabase
     .from("content")
     .select(MOVIE_LIST_SELECT)
-    .eq("content_type", "MOVIE")
+    .eq("content_type", contentType)
     .order("release_date", { ascending: false, nullsFirst: false })
     .order("id", { ascending: false })
     .limit(limit);
@@ -155,6 +158,7 @@ export async function fetchRecentMovies(
 
 export interface MovieDetail {
   id: string;
+  content_type: string;
   canonical_title: string;
   original_title: string | null;
   synopsis_short: string | null;
@@ -175,8 +179,11 @@ export interface MovieDetail {
 }
 
 const MOVIE_DETAIL_SELECT =
-  "id, canonical_title, original_title, synopsis_short, release_date, status, country_code, original_language, runtime_minutes, poster_url, external_rating, external_rating_count, average_rating, rating_count, director, cast_names, age_rating, content_genre(genre(name))";
+  "id, content_type, canonical_title, original_title, synopsis_short, release_date, status, country_code, original_language, runtime_minutes, poster_url, external_rating, external_rating_count, average_rating, rating_count, director, cast_names, age_rating, content_genre(genre(name))";
 
+// Fetches by id only — used by /movies/[id] which now doubles as the
+// generic content detail page for DRAMA/ANIME too (see NOTE in that
+// route), so this deliberately does NOT filter by content_type.
 export async function fetchMovieDetail(
   supabase: SupabaseClient,
   id: string
@@ -185,7 +192,6 @@ export async function fetchMovieDetail(
     .from("content")
     .select(MOVIE_DETAIL_SELECT)
     .eq("id", id)
-    .eq("content_type", "MOVIE")
     .maybeSingle();
 
   if (error) {
@@ -251,7 +257,8 @@ export async function fetchAiCandidateMovies(
 export async function searchMovies(
   supabase: SupabaseClient,
   query: string,
-  limit = 20
+  limit = 20,
+  contentType: string = "MOVIE"
 ): Promise<MovieListItem[]> {
   const term = query.trim();
   if (!term) return [];
@@ -259,7 +266,7 @@ export async function searchMovies(
   const { data, error } = await supabase
     .from("content")
     .select(MOVIE_LIST_SELECT)
-    .eq("content_type", "MOVIE")
+    .eq("content_type", contentType)
     .ilike("canonical_title", `%${term}%`)
     .order("release_date", { ascending: false, nullsFirst: false })
     .limit(limit);
