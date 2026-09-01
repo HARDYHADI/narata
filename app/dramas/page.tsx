@@ -1,26 +1,17 @@
+import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import CategoryBar from "@/components/category-bar";
+import MovieCard from "@/components/movie-card";
 import AuthStatus from "@/components/auth-status";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { fetchRecentMovies } from "@/lib/movies/queries";
 
-// NOTE: no DRAMA content has been ingested yet (only TMDB movies so far),
-// so this page renders the approved static sample design until a drama
-// data source/ingestion pipeline exists.
+export const revalidate = 60;
 
-const HERO_TILES = [
-  { label: "K-DRAMA · 12부작", title: "서울의 마지막 편지" },
-  { label: "J-DRAMA · 시즌 2", title: "비 오는 서점" },
-  { label: "OTT ORIGINAL", title: "백야의 기록" },
-  { label: "UK SERIES", title: "North Window" },
-];
-
-const NOW_AIRING = [
-  { tone: "tone-1", tag: "DRAMA · 8/12화", title: "서울의\n마지막 편지", name: "서울의 마지막 편지", rating: "4.7", note: "댓글 급상승" },
-  { tone: "tone-2", tag: "ROMANCE · 6/10화", title: "비 오는\n서점", name: "비 오는 서점", rating: "4.4", note: "금요일" },
-  { tone: "tone-3", tag: "THRILLER · 시즌 1", title: "백야의\n기록", name: "백야의 기록", rating: "4.6", note: "OTT" },
-  { tone: "tone-4", tag: "HISTORICAL · 24화", title: "장안의\n달", name: "장안의 달", rating: "4.3", note: "완결 임박" },
-  { tone: "tone-1", tag: "UK · 시즌 3", title: "North\nWindow", name: "North Window", rating: "4.5", note: "수요일" },
-];
+// NOTE: weekly broadcast schedule and live "급상승" ranking have no real
+// data source yet (same as the movie home page's static news/ranking
+// sections) — these stay as static sample content from the approved design.
 
 const WEEKDAY_SCHEDULE = [
   { day: "월", episodes: ["검은 정원 9화", "흰 고래 4화"] },
@@ -39,7 +30,12 @@ const RANKING = [
   { rank: 4, title: "비 오는 서점", change: "▼ 1" },
 ];
 
-export default function DramasPage() {
+export default async function DramasPage() {
+  const supabase = getSupabaseClient();
+  const recentDramas = supabase ? await fetchRecentMovies(supabase, 10, "DRAMA") : [];
+  const heroDramas = recentDramas.slice(0, 4);
+  const featured = recentDramas[0];
+
   return (
     <>
       <SiteHeader
@@ -61,62 +57,54 @@ export default function DramasPage() {
       <div className="wrap">
         <div className="hero">
           <div>
-            <span className="pill orange">오늘 밤 10시 공개</span>
+            <span className="pill orange">최근 수집된 드라마</span>
             <h1>
               다음 화를 기다리는
               <br />
               사람들의 드라마
             </h1>
-            <p>국가와 플랫폼을 넘어 방영 일정, 시즌, 원작 관계와 실시간 반응을 한 번에 확인하세요.</p>
-            <div className="actions">
-              <button className="btn orange">서울의 마지막 편지 보기</button>
-            </div>
+            <p>TMDB에서 수집한 드라마 정보를 평점, 장르와 함께 한곳에서 만나보세요.</p>
+            {featured && (
+              <div className="actions">
+                <Link href={`/movies/${featured.id}`} className="btn orange">
+                  {featured.canonical_title} 보기
+                </Link>
+              </div>
+            )}
           </div>
           <div className="hero-grid">
-            {HERO_TILES.map((tile) => (
-              <div key={tile.title} className="genre">
-                <small>{tile.label}</small>
-                <b>{tile.title}</b>
+            {heroDramas.length > 0 ? (
+              heroDramas.map((drama) => (
+                <div key={drama.id} className="genre">
+                  <small>{drama.content_genre[0]?.genre?.name ?? "DRAMA"}</small>
+                  <b>{drama.canonical_title}</b>
+                </div>
+              ))
+            ) : (
+              <div className="genre">
+                <small>DRAMA</small>
+                <b>아직 수집된 드라마가 없어요</b>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
         <div className="section" style={{ borderTop: 0, paddingTop: 0 }}>
           <div className="headrow">
             <div>
-              <h2>지금 방영 중인 드라마</h2>
-              <div className="sub">방영 회차와 댓글 증가량을 함께 반영했어요</div>
-            </div>
-            <div className="tabs">
-              <button className="tab on">전체</button>
-              <button className="tab">한국</button>
-              <button className="tab">일본</button>
-              <button className="tab">중국</button>
-              <button className="tab">영미권</button>
+              <h2>최근 수집된 드라마</h2>
+              <div className="sub">TMDB에서 가져온 드라마를 공개일 최신순으로 보여줍니다</div>
             </div>
           </div>
-          <div className="posters">
-            {NOW_AIRING.map((item) => (
-              <div key={item.name}>
-                <div className={`poster ${item.tone}`}>
-                  <small>{item.tag}</small>
-                  <strong>
-                    {item.title.split("\n").map((line, i) => (
-                      <span key={i}>
-                        {i > 0 && <br />}
-                        {line}
-                      </span>
-                    ))}
-                  </strong>
-                </div>
-                <div className="meta">
-                  <b>{item.name}</b>
-                  <span className="stars">★ {item.rating}</span> · {item.note}
-                </div>
-              </div>
-            ))}
-          </div>
+          {recentDramas.length === 0 ? (
+            <p className="muted">아직 등록된 드라마가 없습니다.</p>
+          ) : (
+            <div className="content-grid">
+              {recentDramas.map((drama) => (
+                <MovieCard key={drama.id} movie={drama} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="section">

@@ -1,26 +1,17 @@
+import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import CategoryBar from "@/components/category-bar";
+import MovieCard from "@/components/movie-card";
 import AuthStatus from "@/components/auth-status";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { fetchRecentMovies } from "@/lib/movies/queries";
 
-// NOTE: no ANIME content has been ingested yet (only TMDB movies so far),
-// so this page renders the approved static sample design until an anime
-// data source/ingestion pipeline exists.
+export const revalidate = 60;
 
-const HERO_TILES = [
-  { label: "TV · 12화", title: "별의 정원" },
-  { label: "ONA · 8화", title: "푸른 우체국" },
-  { label: "MOVIE", title: "빛의 궤도" },
-  { label: "SEQUEL", title: "마도서점 2기" },
-];
-
-const SEASON_TITLES = [
-  { tone: "tone-1", tag: "TV · 월요일", title: "별의\n정원", name: "별의 정원", rating: "4.8", note: "7/12화" },
-  { tone: "tone-2", tag: "ONA · 금요일", title: "푸른\n우체국", name: "푸른 우체국", rating: "4.6", note: "5/8화" },
-  { tone: "tone-3", tag: "TV · 목요일", title: "마도서점\n2기", name: "마도서점 2기", rating: "4.5", note: "원작 있음" },
-  { tone: "tone-4", tag: "MOVIE · 개봉 중", title: "빛의\n궤도", name: "빛의 궤도", rating: "4.7", note: "극장판" },
-  { tone: "tone-1", tag: "TV · 토요일", title: "강철의\n여름", name: "강철의 여름", rating: "4.3", note: "8/13화" },
-];
+// NOTE: today's episode-release schedule and the studio ranking have no
+// real data source yet (same as the movie home page's static news/ranking
+// sections) — these stay as static sample content from the approved design.
 
 const TODAY_EPISODES = [
   { time: "18:00 · TV", title: "별의 정원 7화", note: "스튜디오 토리" },
@@ -37,7 +28,12 @@ const STUDIOS = [
   { rank: 4, name: "North Animation", note: "작품 14" },
 ];
 
-export default function AnimePage() {
+export default async function AnimePage() {
+  const supabase = getSupabaseClient();
+  const recentAnime = supabase ? await fetchRecentMovies(supabase, 10, "ANIME") : [];
+  const heroAnime = recentAnime.slice(0, 4);
+  const featured = recentAnime[0];
+
   return (
     <>
       <SiteHeader
@@ -59,61 +55,54 @@ export default function AnimePage() {
       <div className="wrap">
         <div className="hero">
           <div>
-            <span className="pill orange">2026 SUMMER SEASON</span>
+            <span className="pill orange">최근 수집된 애니</span>
             <h1>
               이번 분기 애니를
               <br />
               놓치지 않는 방법
             </h1>
-            <p>분기 신작부터 극장판, 원작 만화와 제작사 정보까지 연결해서 탐색하세요.</p>
-            <div className="actions">
-              <button className="btn orange">여름 분기 전체 보기</button>
-            </div>
+            <p>TMDB에서 수집한 애니 정보를 평점, 장르와 함께 한곳에서 만나보세요.</p>
+            {featured && (
+              <div className="actions">
+                <Link href={`/movies/${featured.id}`} className="btn orange">
+                  {featured.canonical_title} 보기
+                </Link>
+              </div>
+            )}
           </div>
           <div className="hero-grid">
-            {HERO_TILES.map((tile) => (
-              <div key={tile.title} className="genre">
-                <small>{tile.label}</small>
-                <b>{tile.title}</b>
+            {heroAnime.length > 0 ? (
+              heroAnime.map((anime) => (
+                <div key={anime.id} className="genre">
+                  <small>{anime.content_genre[0]?.genre?.name ?? "ANIME"}</small>
+                  <b>{anime.canonical_title}</b>
+                </div>
+              ))
+            ) : (
+              <div className="genre">
+                <small>ANIME</small>
+                <b>아직 수집된 애니가 없어요</b>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
         <div className="section" style={{ borderTop: 0, paddingTop: 0 }}>
           <div className="headrow">
             <div>
-              <h2>2026 여름 분기 화제작</h2>
-              <div className="sub">방영 평가와 원작 독자 반응을 함께 보여드려요</div>
-            </div>
-            <div className="tabs">
-              <button className="tab on">전체</button>
-              <button className="tab">신작</button>
-              <button className="tab">후속작</button>
-              <button className="tab">극장판</button>
+              <h2>최근 수집된 애니</h2>
+              <div className="sub">TMDB에서 가져온 애니를 공개일 최신순으로 보여줍니다</div>
             </div>
           </div>
-          <div className="posters">
-            {SEASON_TITLES.map((item) => (
-              <div key={item.name}>
-                <div className={`poster ${item.tone}`}>
-                  <small>{item.tag}</small>
-                  <strong>
-                    {item.title.split("\n").map((line, i) => (
-                      <span key={i}>
-                        {i > 0 && <br />}
-                        {line}
-                      </span>
-                    ))}
-                  </strong>
-                </div>
-                <div className="meta">
-                  <b>{item.name}</b>
-                  <span className="stars">★ {item.rating}</span> · {item.note}
-                </div>
-              </div>
-            ))}
-          </div>
+          {recentAnime.length === 0 ? (
+            <p className="muted">아직 등록된 애니가 없습니다.</p>
+          ) : (
+            <div className="content-grid">
+              {recentAnime.map((anime) => (
+                <MovieCard key={anime.id} movie={anime} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="section">
