@@ -3,14 +3,17 @@ import { notFound } from "next/navigation";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { fetchMovieDetail } from "@/lib/movies/queries";
+import { fetchMovieDetail, fetchContentRelations } from "@/lib/movies/queries";
 import { fetchContentVideos, fetchContentWatchProviders } from "@/lib/movies/media";
 import {
   formatCountry,
   formatRuntime,
   formatStatus,
   formatContentTypeLabel,
+  formatRelationType,
 } from "@/lib/movies/format";
+import { fetchReviews, fetchContentTagVotePercentages } from "@/lib/reviews/queries";
+import { getOrCreateContentGallery, fetchGallery, fetchGalleryPosts } from "@/lib/community/queries";
 import RatingWidget from "@/components/reviews/rating-widget";
 import WatchlistButton from "@/components/watchlist-button";
 import CollectionPickerButton from "@/components/collection-picker-button";
@@ -24,10 +27,6 @@ export const revalidate = 60;
 // the URL segment stays "/movies/{id}" for all content types deliberately,
 // to avoid a larger route-renaming refactor right now. Copy below branches
 // on movie.content_type where it matters (see formatContentTypeLabel).
-//
-// NOTE: related works and gallery/review activity aren't backed by real
-// data yet (no community tables). Those sections stay as static sample
-// content from the approved design until that schema exists.
 
 const VIDEO_TYPE_LABELS: Record<string, string> = {
   TRAILER: "예고편",
@@ -55,12 +54,28 @@ export default async function MovieDetailPage({
 
   if (!movie) notFound();
 
-  const [videos, watchProviders] = supabase
+  const [videos, watchProviders, reviews, tagPercentages, relations] = supabase
     ? await Promise.all([
         fetchContentVideos(supabase, movie.id),
         fetchContentWatchProviders(supabase, movie.id),
+        fetchReviews(supabase, movie.id, "helpful"),
+        fetchContentTagVotePercentages(supabase, movie.id),
+        fetchContentRelations(supabase, movie.id),
       ])
-    : [[], []];
+    : [[], [], [], [], []];
+
+  const galleryId = supabase ? await getOrCreateContentGallery(supabase, movie.id) : null;
+  const [gallery, galleryPosts] =
+    galleryId && supabase
+      ? await Promise.all([
+          fetchGallery(supabase, galleryId),
+          fetchGalleryPosts(supabase, galleryId, "comments", 3),
+        ])
+      : [null, []];
+
+  const galleryPostCount = gallery?.post_count ?? 0;
+  const topReview = reviews[0] ?? null;
+  const topTags = [...tagPercentages].filter((t) => t.votes > 0).sort((a, b) => b.percentage - a.percentage).slice(0, 3);
 
   const genreNames = movie.content_genre.map((cg) => cg.genre?.name).filter(Boolean);
   const releaseYear = movie.release_date?.slice(0, 4);
@@ -186,7 +201,7 @@ export default async function MovieDetailPage({
           <a href="#videos">영상·OST</a>
           <a href="#related">관련 작품</a>
           <Link href={`/movies/${id}/gallery`}>
-            갤러리 <b className="orange">328</b>
+            갤러리{galleryPostCount > 0 && <>{" "}<b className="orange">{galleryPostCount}</b></>}
           </Link>
         </nav>
 
@@ -266,26 +281,23 @@ export default async function MovieDetailPage({
               <h2>관련 작품과 세계관</h2>
               <div className="sub">원작, 각색작, 같은 세계관을 연결해 보여줍니다</div>
             </div>
-            <span className="pill">관계 그래프 보기</span>
           </div>
-          <div className="related">
-            <div className="rel">
-              <small>원작 소설</small>
-              <b>파도 아래 기록</b>
+          {relations.length > 0 ? (
+            <div className="related">
+              {relations.map((rel, i) => (
+                <Link
+                  key={rel.content_id}
+                  href={`/movies/${rel.content_id}`}
+                  className={i % 2 === 1 ? "rel alt" : "rel"}
+                >
+                  <small>{formatRelationType(rel.relation_type)}</small>
+                  <b>{rel.canonical_title}</b>
+                </Link>
+              ))}
             </div>
-            <div className="rel alt">
-              <small>프리퀄 웹툰</small>
-              <b>여섯 번째 등대</b>
-            </div>
-            <div className="rel">
-              <small>감독 전작</small>
-              <b>빈 항구</b>
-            </div>
-            <div className="rel alt">
-              <small>비슷한 분위기</small>
-              <b>침묵의 섬</b>
-            </div>
-          </div>
+          ) : (
+            <p className="muted">아직 연결된 관련 작품이 없어요.</p>
+          )}
         </div>
 
         <div className="section">
@@ -294,32 +306,53 @@ export default async function MovieDetailPage({
               <div className="headrow" style={{ margin: 0 }}>
                 <h3>작품 갤러리 인기글</h3>
                 <Link href={`/movies/${id}/gallery`} className="pill orange">
-                  지금 328명
+                  갤러리 보기
                 </Link>
               </div>
-              <div className="feedrow">
-                <span>[분석] 마지막 테이프의 파형 비교해봄</span>
-                <b>86</b>
-              </div>
-              <div className="feedrow">
-                <span>[감상] 이 영화는 두 번째가 진짜다</span>
-                <b>54</b>
-              </div>
-              <div className="feedrow">
-                <span>[정보] 감독 GV 핵심 내용 정리</span>
-                <b>31</b>
-              </div>
+              {galleryPosts.length > 0 ? (
+                galleryPosts.map((post) => (
+                  <Link
+                    key={post.id}
+                    href={`/movies/${id}/gallery/${post.id}`}
+                    className="feedrow"
+                  >
+                    <span>
+                      [{post.head}] {post.title}
+                    </span>
+                    <b>{post.comment_count}</b>
+                  </Link>
+                ))
+              ) : (
+                <p className="muted" style={{ padding: "12px 0" }}>
+                  아직 갤러리에 게시글이 없어요.
+                </p>
+              )}
             </div>
             <div className="card panel">
               <h3>리뷰 요약</h3>
-              <p className="synopsis" style={{ margin: 0 }}>
-                “느린 전개를 견디면 강한 여운이 남는다”는 평가가 많아요. 촬영과 음향은 호평이 우세하며,
-                결말 해석은 크게 두 갈래로 나뉩니다.
-              </p>
-              <div className="tagrow">
-                <span className="pill">촬영이 아름다워요</span>
-                <span className="pill">여운이 길어요</span>
-              </div>
+              {topReview ? (
+                <p className="synopsis" style={{ margin: 0 }}>
+                  {topReview.contains_spoiler && (
+                    <span className="pill orange" style={{ marginRight: 8 }}>
+                      스포일러 포함
+                    </span>
+                  )}
+                  “{topReview.body}”
+                </p>
+              ) : (
+                <p className="muted" style={{ margin: 0 }}>
+                  아직 작성된 리뷰가 없어요. 첫 리뷰를 남겨보세요.
+                </p>
+              )}
+              {topTags.length > 0 && (
+                <div className="tagrow">
+                  {topTags.map((tag) => (
+                    <span key={tag.tag_id} className="pill">
+                      {tag.name} {tag.percentage}%
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <MovieQaBox contentId={movie.id} />

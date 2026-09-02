@@ -48,3 +48,17 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
 export function formatContentTypeLabel(contentType: string): string {
   return CONTENT_TYPE_LABELS[contentType] ?? "영화";
 }
+
+const RELATION_TYPE_LABELS: Record<string, string> = {
+  ORIGINAL: "원작",
+  ADAPTATION: "각색작",
+  SEQUEL: "속편",
+  PREQUEL: "프리퀄",
+  SPINOFF: "스핀오프",
+  REMAKE: "리메이크",
+  SAME_UNIVERSE: "같은 세계관",
+};
+
+export function formatRelationType(relationType: string): string {
+  return RELATION_TYPE_LABELS[relationType] ?? relationType;
+}

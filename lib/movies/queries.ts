@@ -229,6 +229,72 @@ export async function fetchMovieDetail(
   return data as unknown as MovieDetail | null;
 }
 
+export interface ContentRelationItem {
+  content_id: string;
+  canonical_title: string;
+  relation_type: string;
+}
+
+// content_relation rows can point at contentId from either side (it can be
+// the source or the target of a relation), so this reads both directions
+// and resolves the other side's title with a follow-up lookup rather than
+// relying on PostgREST's dual-FK embed disambiguation for a table with two
+// FKs to `content` — simpler to get right without live data to verify against.
+export async function fetchContentRelations(
+  supabase: SupabaseClient,
+  contentId: string
+): Promise<ContentRelationItem[]> {
+  const [asSource, asTarget] = await Promise.all([
+    supabase
+      .from("content_relation")
+      .select("relation_type, target_content_id")
+      .eq("source_content_id", contentId),
+    supabase
+      .from("content_relation")
+      .select("relation_type, source_content_id")
+      .eq("target_content_id", contentId),
+  ]);
+
+  if (asSource.error) console.error("failed to load content relations (source)", asSource.error);
+  if (asTarget.error) console.error("failed to load content relations (target)", asTarget.error);
+
+  const pairs = [
+    ...(asSource.data ?? []).map((row) => ({
+      relation_type: row.relation_type as string,
+      related_id: row.target_content_id as string,
+    })),
+    ...(asTarget.data ?? []).map((row) => ({
+      relation_type: row.relation_type as string,
+      related_id: row.source_content_id as string,
+    })),
+  ];
+
+  if (pairs.length === 0) return [];
+
+  const relatedIds = Array.from(new Set(pairs.map((p) => p.related_id)));
+  const { data: relatedContent, error: relatedError } = await supabase
+    .from("content")
+    .select("id, canonical_title")
+    .in("id", relatedIds);
+
+  if (relatedError) {
+    console.error("failed to load related content titles", relatedError);
+    return [];
+  }
+
+  const titleById = new Map(
+    (relatedContent ?? []).map((row) => [row.id as string, row.canonical_title as string])
+  );
+
+  return pairs
+    .filter((p) => titleById.has(p.related_id))
+    .map((p) => ({
+      content_id: p.related_id,
+      canonical_title: titleById.get(p.related_id)!,
+      relation_type: p.relation_type,
+    }));
+}
+
 export async function fetchMoviesByIds(
   supabase: SupabaseClient,
   ids: string[]
