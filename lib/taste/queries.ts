@@ -294,6 +294,153 @@ export async function fetchTasteTags(supabase: SupabaseClient): Promise<TasteTag
 }
 
 // ---------------------------------------------------------------------------
+// Homepage recommendations
+// ---------------------------------------------------------------------------
+
+export interface HomeRecommendation {
+  id: string;
+  title: string;
+  content_type: string;
+  genre_name: string | null;
+  external_rating: number | null;
+}
+
+export interface HomeRecommendations {
+  personalized: boolean;
+  items: HomeRecommendation[];
+}
+
+const EMPTY_HOME_RECOMMENDATIONS: HomeRecommendations = { personalized: false, items: [] };
+const HOME_REC_CONTENT_TYPES = ["MOVIE", "DRAMA", "ANIME"];
+
+interface HomeRecCandidateRow {
+  id: string;
+  canonical_title: string;
+  content_type: string;
+  external_rating: number | null;
+  content_genre: { genre: { name: string } | null }[];
+}
+
+function toHomeRecommendation(row: HomeRecCandidateRow): HomeRecommendation {
+  return {
+    id: row.id,
+    title: row.canonical_title,
+    content_type: row.content_type,
+    genre_name: row.content_genre[0]?.genre?.name ?? null,
+    external_rating: row.external_rating,
+  };
+}
+
+async function fetchPopularFallback(
+  supabase: SupabaseClient,
+  limit: number
+): Promise<HomeRecommendations> {
+  const { data, error } = await supabase
+    .from("content")
+    .select("id, canonical_title, content_type, external_rating, content_genre(genre(name))")
+    .in("content_type", HOME_REC_CONTENT_TYPES)
+    .order("external_rating", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("failed to load popular fallback for home recommendations", error);
+    return EMPTY_HOME_RECOMMENDATIONS;
+  }
+
+  return {
+    personalized: false,
+    items: ((data ?? []) as unknown as HomeRecCandidateRow[]).map(toHomeRecommendation),
+  };
+}
+
+// Heuristic, not a real recommender: take the genres of content the user
+// rated >= 4, then surface other well-rated content sharing those genres
+// that they haven't rated yet. Falls back to site-wide popular content when
+// logged out or when there's no rating signal to work from yet (expected
+// for most users right now, since login only just shipped).
+export async function fetchHomeRecommendations(
+  supabase: SupabaseClient,
+  limit = 3
+): Promise<HomeRecommendations> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return fetchPopularFallback(supabase, limit);
+
+  const { data: ratings, error: ratingsError } = await supabase
+    .from("content_rating")
+    .select("content_id")
+    .eq("user_id", user.id)
+    .gte("score", LIKED_SCORE_THRESHOLD);
+
+  if (ratingsError) console.error("failed to load ratings for home recommendations", ratingsError);
+
+  const likedIds = (ratings ?? []).map((row) => row.content_id as string);
+  if (likedIds.length === 0) return fetchPopularFallback(supabase, limit);
+
+  const { data: likedGenreLinks, error: likedGenreError } = await supabase
+    .from("content_genre")
+    .select("genre_id")
+    .in("content_id", likedIds);
+
+  if (likedGenreError) {
+    console.error("failed to load liked genres for home recommendations", likedGenreError);
+    return fetchPopularFallback(supabase, limit);
+  }
+
+  const genreCounts = new Map<string, number>();
+  for (const row of likedGenreLinks ?? []) {
+    const genreId = row.genre_id as string;
+    genreCounts.set(genreId, (genreCounts.get(genreId) ?? 0) + 1);
+  }
+
+  const topGenreIds = Array.from(genreCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([genreId]) => genreId);
+
+  if (topGenreIds.length === 0) return fetchPopularFallback(supabase, limit);
+
+  const { data: candidateLinks, error: candidateError } = await supabase
+    .from("content_genre")
+    .select("content_id")
+    .in("genre_id", topGenreIds);
+
+  if (candidateError) {
+    console.error("failed to load candidate content for home recommendations", candidateError);
+    return fetchPopularFallback(supabase, limit);
+  }
+
+  const likedIdSet = new Set(likedIds);
+  const candidateIds = Array.from(
+    new Set((candidateLinks ?? []).map((row) => row.content_id as string))
+  ).filter((id) => !likedIdSet.has(id));
+
+  if (candidateIds.length === 0) return fetchPopularFallback(supabase, limit);
+
+  const { data: recs, error: recsError } = await supabase
+    .from("content")
+    .select("id, canonical_title, content_type, external_rating, content_genre(genre(name))")
+    .in("id", candidateIds)
+    .in("content_type", HOME_REC_CONTENT_TYPES)
+    .order("external_rating", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (recsError) {
+    console.error("failed to load home recommendations", recsError);
+    return fetchPopularFallback(supabase, limit);
+  }
+
+  if (!recs || recs.length === 0) return fetchPopularFallback(supabase, limit);
+
+  return {
+    personalized: true,
+    items: (recs as unknown as HomeRecCandidateRow[]).map(toHomeRecommendation),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // AI search logs
 // ---------------------------------------------------------------------------
 
