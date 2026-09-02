@@ -169,9 +169,39 @@ export default async function Home({
             <div className="posters">
               {trending.map((item: MovieListItem, i: number) => (
                 <Link key={item.id} href={`/movies/${item.id}`}>
-                  <div className={`poster ${TONES[i % TONES.length]}`}>
-                    <small>{heroTag(item, item.content_type)}</small>
-                    <strong>{item.canonical_title}</strong>
+                  <div
+                    className={`poster ${TONES[i % TONES.length]}`}
+                    style={item.poster_url ? { position: "relative", overflow: "hidden" } : undefined}
+                  >
+                    {item.poster_url && (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.poster_url}
+                          alt={item.canonical_title}
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            background: "linear-gradient(to top, rgba(0,0,0,.8), rgba(0,0,0,.05) 55%)",
+                          }}
+                        />
+                      </>
+                    )}
+                    <small style={item.poster_url ? { position: "relative" } : undefined}>
+                      {heroTag(item, item.content_type)}
+                    </small>
+                    <strong style={item.poster_url ? { position: "relative" } : undefined}>
+                      {item.canonical_title}
+                    </strong>
                   </div>
                   <div className="meta">
                     <b>{item.canonical_title}</b>
