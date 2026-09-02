@@ -1,10 +1,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { searchWikidataEntity, fetchWikidataClaims } from "../wikidata/client";
-import { fetchWikipediaSummary } from "../wikipedia/client";
+import { fetchWikipediaFullText } from "../wikipedia/client";
 import { extractRelationsFromText, type RelationType } from "./extractRelationsFromText";
 import { normalizeTitle } from "./util";
 
 const FETCH_PAGE_SIZE = 1000;
+
+// P155 "follows" on this content pointing at `claim.targetQid` means the
+// target happened before this content chronologically (a PREQUEL from this
+// content's perspective); P156 "followed by" means the target comes after
+// (a SEQUEL).
+const WIKIDATA_PROPERTY_TO_RELATION_TYPE: Record<string, RelationType> = {
+  P144: "ADAPTATION",
+  P179: "SAME_UNIVERSE",
+  P155: "PREQUEL",
+  P156: "SEQUEL",
+};
 
 async function fetchAllRows<T>(
   supabase: SupabaseClient,
@@ -147,7 +158,7 @@ export async function discoverRelationsForContent(
       tier1Relations.push({
         source_content_id: content.id,
         target_content_id: matchedId,
-        relation_type: claim.property === "P144" ? "ADAPTATION" : "SAME_UNIVERSE",
+        relation_type: WIKIDATA_PROPERTY_TO_RELATION_TYPE[claim.property],
         confidence: 1.0,
         source_id: "wikidata",
         evidence_text: null,
@@ -160,11 +171,11 @@ export async function discoverRelationsForContent(
 
   // Tier 2 only runs when tier 1 found nothing, to control OpenAI cost.
   if (tier1Relations.length === 0) {
-    const summary = await fetchWikipediaSummary(content.canonical_title, "ko");
-    if (!summary) {
+    const article = await fetchWikipediaFullText(content.canonical_title, "ko");
+    if (!article) {
       skippedTier2Reason = "no_wikipedia_extract";
     } else {
-      const extracted = await extractRelationsFromText(content.canonical_title, summary.extract);
+      const extracted = await extractRelationsFromText(content.canonical_title, article.text);
       for (const rel of extracted) {
         const matchedId = indexes.titleIndex.get(normalizeTitle(rel.relatedTitle));
         if (!matchedId || matchedId === content.id) continue;
