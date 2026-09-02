@@ -66,10 +66,16 @@ export default async function Home({
       ])
     : [[], [], [], [], []];
 
-  const heroTiles: { type: string; title: string; href: string }[] = [
-    ...(heroMovie[0] ? [{ type: "MOVIE", title: heroMovie[0].canonical_title, href: `/movies/${heroMovie[0].id}` }] : []),
-    ...(heroDrama[0] ? [{ type: "DRAMA", title: heroDrama[0].canonical_title, href: `/movies/${heroDrama[0].id}` }] : []),
-    ...(heroAnime[0] ? [{ type: "ANIME", title: heroAnime[0].canonical_title, href: `/movies/${heroAnime[0].id}` }] : []),
+  const heroTiles: { type: string; title: string; href: string; poster_url: string | null }[] = [
+    ...(heroMovie[0]
+      ? [{ type: "MOVIE", title: heroMovie[0].canonical_title, href: `/movies/${heroMovie[0].id}`, poster_url: heroMovie[0].poster_url }]
+      : []),
+    ...(heroDrama[0]
+      ? [{ type: "DRAMA", title: heroDrama[0].canonical_title, href: `/movies/${heroDrama[0].id}`, poster_url: heroDrama[0].poster_url }]
+      : []),
+    ...(heroAnime[0]
+      ? [{ type: "ANIME", title: heroAnime[0].canonical_title, href: `/movies/${heroAnime[0].id}`, poster_url: heroAnime[0].poster_url }]
+      : []),
   ];
 
   return (
@@ -131,9 +137,31 @@ export default async function Home({
           </div>
           <div className="hero-grid">
             {heroTiles.map((tile) => (
-              <Link key={tile.href} href={tile.href} className="genre">
-                <small>{tile.type}</small>
-                <strong>{tile.title}</strong>
+              <Link
+                key={tile.href}
+                href={tile.href}
+                className="genre"
+                style={tile.poster_url ? { position: "relative", overflow: "hidden" } : undefined}
+              >
+                {tile.poster_url && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={tile.poster_url}
+                      alt={tile.title}
+                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "linear-gradient(to top, rgba(0,0,0,.8), rgba(0,0,0,.05) 55%)",
+                      }}
+                    />
+                  </>
+                )}
+                <small style={tile.poster_url ? { position: "relative" } : undefined}>{tile.type}</small>
+                <strong style={tile.poster_url ? { position: "relative" } : undefined}>{tile.title}</strong>
               </Link>
             ))}
             {heroTiles.length < 4 && (
