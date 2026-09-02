@@ -5,6 +5,7 @@ export const MOVIE_PAGE_SIZE = 24;
 export interface MovieListItem {
   id: string;
   canonical_title: string;
+  content_type: string;
   release_date: string | null;
   poster_url: string | null;
   average_rating: number;
@@ -13,7 +14,7 @@ export interface MovieListItem {
 }
 
 const MOVIE_LIST_SELECT =
-  "id, canonical_title, release_date, poster_url, average_rating, external_rating, content_genre(genre(name))";
+  "id, canonical_title, content_type, release_date, poster_url, average_rating, external_rating, content_genre(genre(name))";
 
 export async function fetchMoviePage(
   supabase: SupabaseClient,
@@ -150,6 +151,32 @@ export async function fetchRecentMovies(
 
   if (error) {
     console.error("failed to load recent movies", error);
+    return [];
+  }
+
+  return (data ?? []) as unknown as MovieListItem[];
+}
+
+// Used by the main homepage's "지금 가장 많이 보는 작품" strip, which spans
+// multiple content types (unlike the rest of this module's MOVIE-only
+// callers) — takes an explicit list of types rather than defaulting.
+export async function fetchTopRatedContent(
+  supabase: SupabaseClient,
+  limit: number,
+  contentTypes: string[]
+): Promise<MovieListItem[]> {
+  if (contentTypes.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("content")
+    .select(MOVIE_LIST_SELECT)
+    .in("content_type", contentTypes)
+    .order("external_rating", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("failed to load top rated content", error);
     return [];
   }
 

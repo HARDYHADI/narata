@@ -1,6 +1,12 @@
 import Link from "next/link";
 import SiteFooter from "@/components/site-footer";
 import AuthStatus from "@/components/auth-status";
+import HomeRecommendations from "@/components/home-recommendations";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { fetchTopRatedContent, fetchRecentMovies, type MovieListItem } from "@/lib/movies/queries";
+import { fetchCommunityFeed, type FeedPostItem } from "@/lib/community/queries";
+
+export const revalidate = 60;
 
 const CONTENT_NAV = [
   { label: "영화", href: "/movies" },
@@ -11,26 +17,21 @@ const CONTENT_NAV = [
   { label: "웹소설", href: "/webnovels" },
 ];
 
-const HERO_GENRES = [
-  { type: "MOVIE", title: "검은 파도의 밤" },
-  { type: "WEBTOON", title: "호랑이의 계절" },
-  { type: "NOVEL", title: "회귀한 서기관" },
-  { type: "ANIME", title: "별의 정원" },
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  MOVIE: "영화",
+  DRAMA: "드라마",
+  ANIME: "애니",
+};
+
+const TRENDING_TABS: { key: string; label: string; contentTypes: string[] }[] = [
+  { key: "all", label: "전체", contentTypes: ["MOVIE", "DRAMA", "ANIME"] },
+  { key: "movie", label: "영화", contentTypes: ["MOVIE"] },
+  { key: "drama", label: "드라마", contentTypes: ["DRAMA"] },
+  { key: "anime", label: "애니", contentTypes: ["ANIME"] },
+  { key: "webtoon", label: "웹툰", contentTypes: ["WEBTOON"] },
 ];
 
-const TRENDING = [
-  { tone: "tone-1", tag: "MOVIE · 2026", title: "검은 파도의\n밤", name: "검은 파도의 밤", rating: "4.6", note: "토론 2.8천" },
-  { tone: "tone-2", tag: "WEBTOON · 연재중", title: "호랑이의\n계절", name: "호랑이의 계절", rating: "4.8", note: "리뷰 9.1천" },
-  { tone: "tone-3", tag: "DRAMA · 12부작", title: "서울의\n마지막 편지", name: "서울의 마지막 편지", rating: "4.4", note: "댓글 급상승" },
-  { tone: "tone-4", tag: "ANIME · TV", title: "별의\n정원", name: "별의 정원", rating: "4.7", note: "찜 1.2만" },
-  { tone: "tone-5", tag: "WEBNOVEL · 완결", title: "회귀한\n서기관", name: "회귀한 서기관", rating: "4.5", note: "리뷰 4.3천" },
-];
-
-const RECOMMENDATIONS = [
-  { tone: "", match: "92% · 영화", title: "여름의 증언", note: "서정적 미스터리" },
-  { tone: "tone-2", match: "89% · 애니", title: "푸른 우체국", note: "따뜻한 성장물" },
-  { tone: "tone-3", match: "87% · 웹툰", title: "작은 궤도", note: "낮은 로맨스 비중" },
-];
+const TONES = ["tone-1", "tone-2", "tone-3", "tone-4", "tone-5"];
 
 const RANKING = [
   { rank: 1, title: "호랑이의 계절", change: "▲ 12" },
@@ -39,13 +40,38 @@ const RANKING = [
   { rank: 4, title: "회귀한 서기관", change: "▲ 3" },
 ];
 
-const HOT_POSTS = [
-  { title: "[분석] 마지막 장면의 소나무가 뜻하는 것", comments: 128 },
-  { title: "[감상] 스포 없이 말한다, 이번 화 미쳤다", comments: 94 },
-  { title: "[질문] 이 설정 원작 몇 화에서 나왔음?", comments: 67 },
-];
+function heroTag(movie: MovieListItem, contentType: string): string {
+  const year = movie.release_date?.slice(0, 4);
+  const genre = movie.content_genre[0]?.genre?.name;
+  return [CONTENT_TYPE_LABELS[contentType] ?? contentType, year ?? genre].filter(Boolean).join(" · ");
+}
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string }>;
+}) {
+  const { category } = await searchParams;
+  const activeTab = TRENDING_TABS.find((t) => t.key === category) ?? TRENDING_TABS[0];
+
+  const supabase = getSupabaseClient();
+
+  const [heroMovie, heroDrama, heroAnime, trending, hotPosts] = supabase
+    ? await Promise.all([
+        fetchRecentMovies(supabase, 1, "MOVIE"),
+        fetchRecentMovies(supabase, 1, "DRAMA"),
+        fetchRecentMovies(supabase, 1, "ANIME"),
+        fetchTopRatedContent(supabase, 5, activeTab.contentTypes),
+        fetchCommunityFeed(supabase, "comments", 3),
+      ])
+    : [[], [], [], [], []];
+
+  const heroTiles: { type: string; title: string; href: string }[] = [
+    ...(heroMovie[0] ? [{ type: "MOVIE", title: heroMovie[0].canonical_title, href: `/movies/${heroMovie[0].id}` }] : []),
+    ...(heroDrama[0] ? [{ type: "DRAMA", title: heroDrama[0].canonical_title, href: `/movies/${heroDrama[0].id}` }] : []),
+    ...(heroAnime[0] ? [{ type: "ANIME", title: heroAnime[0].canonical_title, href: `/movies/${heroAnime[0].id}` }] : []),
+  ];
+
   return (
     <>
       <header className="header">
@@ -79,7 +105,7 @@ export default function Home() {
       <div className="wrap">
         <div className="hero">
           <div>
-            <span className="pill orange">이번 주 이야기 1위</span>
+            <span className="pill orange">모든 매체를 한곳에서</span>
             <h1>
               좋아하는 이야기를
               <br />
@@ -104,12 +130,18 @@ export default function Home() {
             </div>
           </div>
           <div className="hero-grid">
-            {HERO_GENRES.map((g) => (
-              <div key={g.title} className="genre">
-                <small>{g.type}</small>
-                <strong>{g.title}</strong>
-              </div>
+            {heroTiles.map((tile) => (
+              <Link key={tile.href} href={tile.href} className="genre">
+                <small>{tile.type}</small>
+                <strong>{tile.title}</strong>
+              </Link>
             ))}
+            {heroTiles.length < 4 && (
+              <div className="genre">
+                <small>WEBTOON · WEBNOVEL</small>
+                <strong>매체 준비 중이에요</strong>
+              </div>
+            )}
           </div>
         </div>
 
@@ -117,59 +149,45 @@ export default function Home() {
           <div className="headrow">
             <div>
               <h2>지금 가장 많이 보는 작품</h2>
-              <div className="sub">모든 매체의 평점과 토론량을 함께 반영했어요</div>
+              <div className="sub">TMDB 평점 기준으로 매체별 인기작을 보여드려요</div>
             </div>
             <div className="tabs">
-              <button className="tab on">전체</button>
-              <button className="tab">영화</button>
-              <button className="tab">드라마</button>
-              <button className="tab">애니</button>
-              <button className="tab">웹툰</button>
+              {TRENDING_TABS.map((tab) => (
+                <Link
+                  key={tab.key}
+                  href={tab.key === "all" ? "/" : `/?category=${tab.key}`}
+                  className={`tab${tab.key === activeTab.key ? " on" : ""}`}
+                >
+                  {tab.label}
+                </Link>
+              ))}
             </div>
           </div>
-          <div className="posters">
-            {TRENDING.map((item) => (
-              <div key={item.name}>
-                <div className={`poster ${item.tone}`}>
-                  <small>{item.tag}</small>
-                  <strong>
-                    {item.title.split("\n").map((line, i) => (
-                      <span key={i}>
-                        {i > 0 && <br />}
-                        {line}
-                      </span>
-                    ))}
-                  </strong>
-                </div>
-                <div className="meta">
-                  <b>{item.name}</b>
-                  <span className="stars">★ {item.rating}</span> · {item.note}
-                </div>
-              </div>
-            ))}
-          </div>
+          {trending.length === 0 ? (
+            <p className="muted">아직 수집된 작품이 없어요.</p>
+          ) : (
+            <div className="posters">
+              {trending.map((item: MovieListItem, i: number) => (
+                <Link key={item.id} href={`/movies/${item.id}`}>
+                  <div className={`poster ${TONES[i % TONES.length]}`}>
+                    <small>{heroTag(item, item.content_type)}</small>
+                    <strong>{item.canonical_title}</strong>
+                  </div>
+                  <div className="meta">
+                    <b>{item.canonical_title}</b>
+                    {item.external_rating != null && (
+                      <span className="stars">★ {item.external_rating.toFixed(1)}</span>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="section">
           <div className="home-lower">
-            <div className="card recommend">
-              <div className="headrow" style={{ margin: 0 }}>
-                <div>
-                  <h2 style={{ fontSize: 24 }}>지우님 취향에 맞는 작품</h2>
-                  <div className="sub">잔잔한 미스터리 · 성장 서사를 좋아하네요</div>
-                </div>
-                <span className="pill orange">취향 일치 92%</span>
-              </div>
-              <div className="recs">
-                {RECOMMENDATIONS.map((r) => (
-                  <div key={r.title} className={`rec ${r.tone}`}>
-                    <small>{r.match}</small>
-                    <b>{r.title}</b>
-                    <small>{r.note}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <HomeRecommendations />
             <div className="card rank">
               <h2 style={{ fontSize: 24 }}>실시간 급상승</h2>
               {RANKING.map((r) => (
@@ -188,12 +206,30 @@ export default function Home() {
                 <h2 style={{ fontSize: 22 }}>실시간 인기글</h2>
                 <span className="pill">댓글 빠른 순</span>
               </div>
-              {HOT_POSTS.map((p) => (
-                <div key={p.title} className="feedrow">
-                  <span>{p.title}</span>
-                  <b>{p.comments}</b>
-                </div>
-              ))}
+              {hotPosts.length === 0 ? (
+                <p className="muted" style={{ padding: "12px 0" }}>
+                  아직 등록된 글이 없어요.
+                </p>
+              ) : (
+                hotPosts.map((p: FeedPostItem) => {
+                  const contentId = p.gallery?.content?.id;
+                  const body = (
+                    <>
+                      <span>{p.title}</span>
+                      <b>{p.comment_count}</b>
+                    </>
+                  );
+                  return contentId ? (
+                    <Link key={p.id} href={`/movies/${contentId}/gallery/${p.id}`} className="feedrow">
+                      {body}
+                    </Link>
+                  ) : (
+                    <div key={p.id} className="feedrow">
+                      {body}
+                    </div>
+                  );
+                })
+              )}
             </div>
             <div className="card ai-banner">
               <div>
