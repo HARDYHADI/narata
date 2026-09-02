@@ -229,6 +229,23 @@ export async function fetchTvShowsByVoteCount(page = 1) {
   });
 }
 
+const TMDB_ANIMATION_GENRE_ID = "16";
+
+/**
+ * Same as fetchTvShowsByVoteCount, but restricted to TMDB's Animation genre
+ * (id 16) — the same id the ingestion pipeline uses to classify a show as
+ * ANIME. Lets a bulk backfill target anime specifically instead of pulling
+ * from the general (drama-heavy by volume) top-TV-by-vote-count pool.
+ */
+export async function fetchAnimeByVoteCount(page = 1) {
+  return tmdbFetch<TmdbTvListPage>("/discover/tv", {
+    page: String(page),
+    language: "ko-KR",
+    sort_by: "vote_count.desc",
+    with_genres: TMDB_ANIMATION_GENRE_ID,
+  });
+}
+
 export async function fetchTvShowDetails(id: number) {
   return tmdbFetch<TmdbTvShowDetails>(`/tv/${id}`, { language: "ko-KR" });
 }
