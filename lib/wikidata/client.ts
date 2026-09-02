@@ -108,10 +108,13 @@ export async function searchWikidataEntity(
   return findConfidentCandidate(enCandidates, releaseYear, contentType);
 }
 
+const RELATION_PROPERTIES = ["P144", "P179", "P155", "P156"] as const;
+type RelationProperty = (typeof RELATION_PROPERTIES)[number];
+
 export interface WikidataClaimRelation {
   targetQid: string;
   label: string | null;
-  property: "P144" | "P179";
+  property: RelationProperty;
 }
 
 interface WikidataEntity {
@@ -138,7 +141,7 @@ async function fetchEntityData(qid: string): Promise<WikidataEntity | null> {
   return data.entities?.[qid] ?? null;
 }
 
-function extractClaimTargets(entity: WikidataEntity, property: "P144" | "P179"): string[] {
+function extractClaimTargets(entity: WikidataEntity, property: RelationProperty): string[] {
   const claims = entity.claims?.[property] ?? [];
   return claims
     .map((c) => c.mainsnak?.datavalue?.value?.id)
@@ -173,27 +176,38 @@ async function resolveLabels(qids: string[]): Promise<Map<string, string | null>
 }
 
 /**
- * Looks up P144 (based on) and P179 (part of the series) claims on `qid`
- * and resolves each claim target's label (ko, falling back to en). Returns
- * an empty array if the entity has neither claim, or if it can't be fetched.
+ * Looks up P144 (based on), P179 (part of the series), P155 (follows), and
+ * P156 (followed by) claims on `qid` and resolves each claim target's label
+ * (ko, falling back to en). Returns an empty array if the entity has none
+ * of these claims, or if it can't be fetched.
+ *
+ * P155/P156 catch direct sequel/prequel chains that P179 often misses —
+ * "part of the series" commonly points at an abstract series/franchise
+ * item rather than a specific sibling work, which won't match anything in
+ * our own content table. P155/P156 point at the actual adjacent work.
+ * There's likely still real coverage this doesn't reach (e.g. spin-offs
+ * grouped only via a shared P8345 "media franchise" item rather than any
+ * direct claim between the two works) — left out of this pass rather than
+ * guessing at property IDs without a way to verify them live.
  */
 export async function fetchWikidataClaims(qid: string): Promise<WikidataClaimRelation[]> {
   const entity = await fetchEntityData(qid);
   if (!entity) return [];
 
-  const adaptationTargets = extractClaimTargets(entity, "P144");
-  const universeTargets = extractClaimTargets(entity, "P179");
-  const allTargets = Array.from(new Set([...adaptationTargets, ...universeTargets]));
+  const targetsByProperty = new Map<RelationProperty, string[]>(
+    RELATION_PROPERTIES.map((property) => [property, extractClaimTargets(entity, property)])
+  );
+
+  const allTargets = Array.from(new Set(Array.from(targetsByProperty.values()).flat()));
   if (allTargets.length === 0) return [];
 
   const labels = await resolveLabels(allTargets);
 
   const relations: WikidataClaimRelation[] = [];
-  for (const targetQid of adaptationTargets) {
-    relations.push({ targetQid, label: labels.get(targetQid) ?? null, property: "P144" });
-  }
-  for (const targetQid of universeTargets) {
-    relations.push({ targetQid, label: labels.get(targetQid) ?? null, property: "P179" });
+  for (const property of RELATION_PROPERTIES) {
+    for (const targetQid of targetsByProperty.get(property) ?? []) {
+      relations.push({ targetQid, label: labels.get(targetQid) ?? null, property });
+    }
   }
   return relations;
 }
