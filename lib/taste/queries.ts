@@ -303,6 +303,7 @@ export interface HomeRecommendation {
   content_type: string;
   genre_name: string | null;
   external_rating: number | null;
+  poster_url: string | null;
 }
 
 export interface HomeRecommendations {
@@ -318,8 +319,12 @@ interface HomeRecCandidateRow {
   canonical_title: string;
   content_type: string;
   external_rating: number | null;
+  poster_url: string | null;
   content_genre: { genre: { name: string } | null }[];
 }
+
+const HOME_REC_CANDIDATE_SELECT =
+  "id, canonical_title, content_type, external_rating, poster_url, content_genre(genre(name))";
 
 function toHomeRecommendation(row: HomeRecCandidateRow): HomeRecommendation {
   return {
@@ -328,6 +333,7 @@ function toHomeRecommendation(row: HomeRecCandidateRow): HomeRecommendation {
     content_type: row.content_type,
     genre_name: row.content_genre[0]?.genre?.name ?? null,
     external_rating: row.external_rating,
+    poster_url: row.poster_url,
   };
 }
 
@@ -337,7 +343,7 @@ async function fetchPopularFallback(
 ): Promise<HomeRecommendations> {
   const { data, error } = await supabase
     .from("content")
-    .select("id, canonical_title, content_type, external_rating, content_genre(genre(name))")
+    .select(HOME_REC_CANDIDATE_SELECT)
     .in("content_type", HOME_REC_CONTENT_TYPES)
     .order("external_rating", { ascending: false, nullsFirst: false })
     .limit(limit);
@@ -421,7 +427,7 @@ export async function fetchHomeRecommendations(
 
   const { data: recs, error: recsError } = await supabase
     .from("content")
-    .select("id, canonical_title, content_type, external_rating, content_genre(genre(name))")
+    .select(HOME_REC_CANDIDATE_SELECT)
     .in("id", candidateIds)
     .in("content_type", HOME_REC_CONTENT_TYPES)
     .order("external_rating", { ascending: false, nullsFirst: false })

@@ -51,13 +51,37 @@ export default function HomeRecommendations() {
           <small className="muted">아직 추천할 작품이 없어요.</small>
         )}
         {data?.items.map((item, i) => (
-          <Link key={item.id} href={`/movies/${item.id}`} className={`rec ${TONES[i % TONES.length]}`}>
-            <small>
+          <Link
+            key={item.id}
+            href={`/movies/${item.id}`}
+            className={`rec ${TONES[i % TONES.length]}`}
+            style={item.poster_url ? { position: "relative", overflow: "hidden" } : undefined}
+          >
+            {item.poster_url && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.poster_url}
+                  alt={item.title}
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(to top, rgba(0,0,0,.8), rgba(0,0,0,.05) 55%)",
+                  }}
+                />
+              </>
+            )}
+            <small style={item.poster_url ? { position: "relative" } : undefined}>
               {CONTENT_TYPE_LABELS[item.content_type] ?? item.content_type}
               {item.genre_name ? ` · ${item.genre_name}` : ""}
             </small>
-            <b>{item.title}</b>
-            <small>{item.external_rating != null ? `TMDB 평점 ${item.external_rating.toFixed(1)}` : ""}</small>
+            <b style={item.poster_url ? { position: "relative" } : undefined}>{item.title}</b>
+            <small style={item.poster_url ? { position: "relative" } : undefined}>
+              {item.external_rating != null ? `TMDB 평점 ${item.external_rating.toFixed(1)}` : ""}
+            </small>
           </Link>
         ))}
       </div>
