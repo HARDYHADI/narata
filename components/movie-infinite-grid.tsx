@@ -13,9 +13,11 @@ import MovieCard from "@/components/movie-card";
 export default function MovieInfiniteGrid({
   initialMovies,
   filters = {},
+  contentType = "MOVIE",
 }: {
   initialMovies: MovieListItem[];
   filters?: MovieFilterParams;
+  contentType?: string;
 }) {
   const [movies, setMovies] = useState(initialMovies);
   const [hasMore, setHasMore] = useState(initialMovies.length === MOVIE_PAGE_SIZE);
@@ -39,7 +41,12 @@ export default function MovieInfiniteGrid({
           return;
         }
 
-        const next = await fetchFilteredMoviePage(supabase, nextPageRef.current, filters);
+        const next = await fetchFilteredMoviePage(
+          supabase,
+          nextPageRef.current,
+          filters,
+          contentType
+        );
         nextPageRef.current += 1;
         setMovies((prev) => [...prev, ...next]);
         setHasMore(next.length === MOVIE_PAGE_SIZE);
