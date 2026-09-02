@@ -230,9 +230,11 @@ export async function fetchMovieDetail(
 }
 
 export interface ContentRelationItem {
+  id: string;
   content_id: string;
   canonical_title: string;
   relation_type: string;
+  confidence: number | null;
 }
 
 // content_relation rows can point at contentId from either side (it can be
@@ -247,12 +249,14 @@ export async function fetchContentRelations(
   const [asSource, asTarget] = await Promise.all([
     supabase
       .from("content_relation")
-      .select("relation_type, target_content_id")
-      .eq("source_content_id", contentId),
+      .select("id, relation_type, confidence, target_content_id")
+      .eq("source_content_id", contentId)
+      .eq("is_hidden", false),
     supabase
       .from("content_relation")
-      .select("relation_type, source_content_id")
-      .eq("target_content_id", contentId),
+      .select("id, relation_type, confidence, source_content_id")
+      .eq("target_content_id", contentId)
+      .eq("is_hidden", false),
   ]);
 
   if (asSource.error) console.error("failed to load content relations (source)", asSource.error);
@@ -260,11 +264,15 @@ export async function fetchContentRelations(
 
   const pairs = [
     ...(asSource.data ?? []).map((row) => ({
+      id: row.id as string,
       relation_type: row.relation_type as string,
+      confidence: row.confidence as number | null,
       related_id: row.target_content_id as string,
     })),
     ...(asTarget.data ?? []).map((row) => ({
+      id: row.id as string,
       relation_type: row.relation_type as string,
+      confidence: row.confidence as number | null,
       related_id: row.source_content_id as string,
     })),
   ];
@@ -289,9 +297,11 @@ export async function fetchContentRelations(
   return pairs
     .filter((p) => titleById.has(p.related_id))
     .map((p) => ({
+      id: p.id,
       content_id: p.related_id,
       canonical_title: titleById.get(p.related_id)!,
       relation_type: p.relation_type,
+      confidence: p.confidence,
     }));
 }
 
