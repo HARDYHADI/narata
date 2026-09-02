@@ -19,6 +19,7 @@ import WatchlistButton from "@/components/watchlist-button";
 import CollectionPickerButton from "@/components/collection-picker-button";
 import MovieQaBox from "@/components/movie-qa-box";
 import AuthStatus from "@/components/auth-status";
+import RelationFeedbackButtons from "@/components/relation-feedback";
 
 export const revalidate = 60;
 
@@ -286,12 +287,18 @@ export default async function MovieDetailPage({
             <div className="related">
               {relations.map((rel, i) => (
                 <Link
-                  key={rel.content_id}
+                  key={rel.id}
                   href={`/movies/${rel.content_id}`}
                   className={i % 2 === 1 ? "rel alt" : "rel"}
                 >
-                  <small>{formatRelationType(rel.relation_type)}</small>
+                  <small>
+                    {formatRelationType(rel.relation_type)}
+                    {rel.confidence != null && rel.confidence < 0.9 && (
+                      <span className="rel-badge">AI 추정 · 확인 필요</span>
+                    )}
+                  </small>
                   <b>{rel.canonical_title}</b>
+                  <RelationFeedbackButtons relationId={rel.id} />
                 </Link>
               ))}
             </div>
