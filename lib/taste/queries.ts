@@ -481,6 +481,22 @@ export async function fetchMyAiSearchLogs(
   return (data ?? []) as AiSearchLogItem[];
 }
 
+export async function clearMyAiSearchLogs(supabase: SupabaseClient): Promise<MutationResult> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "not_authenticated" };
+
+  const { error } = await supabase.from("ai_search_log").delete().eq("user_id", user.id);
+
+  if (error) {
+    console.error("failed to clear AI search logs", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
 export type AiSearchFeedback = "RELEVANT" | "NOT_RELEVANT";
 
 export async function submitAiSearchFeedback(

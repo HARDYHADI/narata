@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import CategoryBar from "@/components/category-bar";
@@ -48,7 +49,7 @@ export default function WebtoonsPage() {
         searchPlaceholder="웹툰·작가·플랫폼 검색"
         actions={
           <>
-            <button className="btn orange">AI 찾기</button>
+            <Link href="/ai" className="btn orange">AI 찾기</Link>
             <AuthStatus />
           </>
         }

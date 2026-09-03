@@ -1,6 +1,8 @@
+import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import TasteDashboard from "@/components/taste/taste-dashboard";
+import ShareButton from "@/components/share-button";
 
 export default function TastePage() {
   return (
@@ -9,8 +11,10 @@ export default function TastePage() {
         active="taste"
         actions={
           <>
-            <button className="btn ghost">설정</button>
-            <button className="btn">프로필 공유</button>
+            <Link href="#preferences" className="btn ghost">
+              설정
+            </Link>
+            <ShareButton title="나라타 - 내 취향" label="프로필 공유" className="btn" />
           </>
         }
       />
