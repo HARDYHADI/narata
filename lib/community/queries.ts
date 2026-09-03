@@ -89,7 +89,8 @@ export async function fetchGalleryPosts(
   supabase: SupabaseClient,
   galleryId: string,
   sort: PostSort = "comments",
-  limit = 30
+  limit = 30,
+  head?: string | null
 ): Promise<PostListItem[]> {
   let query = supabase
     .from("post")
@@ -97,6 +98,10 @@ export async function fetchGalleryPosts(
     .eq("gallery_id", galleryId)
     .eq("is_hidden", false)
     .order("is_notice", { ascending: false });
+
+  if (head) {
+    query = query.eq("head", head);
+  }
 
   query =
     sort === "comments"
@@ -111,6 +116,31 @@ export async function fetchGalleryPosts(
   }
 
   return (data ?? []) as unknown as PostListItem[];
+}
+
+// Real per-head post counts for the gallery sidebar (previously just a
+// static list of head labels with no counts at all).
+export async function fetchGalleryHeadCounts(
+  supabase: SupabaseClient,
+  galleryId: string
+): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from("post")
+    .select("head")
+    .eq("gallery_id", galleryId)
+    .eq("is_hidden", false);
+
+  if (error) {
+    console.error("failed to load gallery head counts", error);
+    return {};
+  }
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const head = row.head as string;
+    counts[head] = (counts[head] ?? 0) + 1;
+  }
+  return counts;
 }
 
 export interface PostDetail extends PostListItem {

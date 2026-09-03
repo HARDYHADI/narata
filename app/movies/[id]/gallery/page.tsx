@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
@@ -10,6 +11,7 @@ import {
   getOrCreateContentGallery,
   fetchGallery,
   fetchGalleryPosts,
+  fetchGalleryHeadCounts,
   fetchTrendingGalleries,
 } from "@/lib/community/queries";
 import { POST_HEADS } from "@/lib/community/format";
@@ -18,10 +20,13 @@ export const revalidate = 0;
 
 export default async function MovieGalleryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ head?: string }>;
 }) {
   const { id } = await params;
+  const { head: activeHead } = await searchParams;
   const supabase = getSupabaseClient();
   if (!supabase) notFound();
 
@@ -31,9 +36,10 @@ export default async function MovieGalleryPage({
   const galleryId = await getOrCreateContentGallery(supabase, id);
   if (!galleryId) notFound();
 
-  const [gallery, posts, trending] = await Promise.all([
+  const [gallery, posts, headCounts, trending] = await Promise.all([
     fetchGallery(supabase, galleryId),
-    fetchGalleryPosts(supabase, galleryId, "comments"),
+    fetchGalleryPosts(supabase, galleryId, "comments", 30, activeHead),
+    fetchGalleryHeadCounts(supabase, galleryId),
     fetchTrendingGalleries(supabase, 5),
   ]);
 
@@ -81,7 +87,12 @@ export default async function MovieGalleryPage({
                 basePath={basePath}
               />
             </div>
-            <PostBoard galleryId={galleryId} basePath={basePath} initialPosts={posts} />
+            <PostBoard
+              galleryId={galleryId}
+              basePath={basePath}
+              initialPosts={posts}
+              activeHead={activeHead}
+            />
           </div>
 
           <aside className="side">
@@ -95,10 +106,17 @@ export default async function MovieGalleryPage({
             <div className="card sidebox">
               <h3>말머리</h3>
               <div className="gallery">
+                <Link href={basePath} className={`pill${!activeHead ? " on" : ""}`}>
+                  전체 {Object.values(headCounts).reduce((a, b) => a + b, 0)}
+                </Link>
                 {selectableHeads.map((h) => (
-                  <span key={h} className="pill">
-                    {h}
-                  </span>
+                  <Link
+                    key={h}
+                    href={`${basePath}?head=${encodeURIComponent(h)}`}
+                    className={`pill${activeHead === h ? " on" : ""}`}
+                  >
+                    {h} {headCounts[h] ?? 0}
+                  </Link>
                 ))}
               </div>
             </div>
