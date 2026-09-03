@@ -34,13 +34,24 @@ export default function ReviewList({
 
   async function handleSort(next: ReviewSort) {
     if (next === sort) return;
-    setSort(next);
-    setLoading(true);
     const supabase = getSupabaseClient();
-    if (supabase) {
-      const data = await fetchReviews(supabase, contentId, next);
-      setReviews(data);
+    if (!supabase) return;
+
+    if (next === "taste") {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setNotice("로그인 후 이용할 수 있어요.");
+        return;
+      }
     }
+
+    setSort(next);
+    setNotice(null);
+    setLoading(true);
+    const data = await fetchReviews(supabase, contentId, next);
+    setReviews(data);
     setLoading(false);
   }
 
@@ -75,7 +86,7 @@ export default function ReviewList({
           <button type="button" className={`tab${sort === "latest" ? " on" : ""}`} onClick={() => handleSort("latest")}>
             최신순
           </button>
-          <button type="button" className="tab" disabled>
+          <button type="button" className={`tab${sort === "taste" ? " on" : ""}`} onClick={() => handleSort("taste")}>
             내 취향순
           </button>
         </div>
@@ -101,6 +112,11 @@ export default function ReviewList({
             <div className="review-head">
               <b>
                 {r.author_nickname} <span className="stars">★ {r.score.toFixed(1)}</span>
+                {sort === "taste" && r.taste_match_count !== undefined && (
+                  <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>
+                    취향 태그 {r.taste_match_count}개 일치
+                  </span>
+                )}
               </b>
               <span className="sub">{formatRelativeTime(r.created_at)}</span>
             </div>
