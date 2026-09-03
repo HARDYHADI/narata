@@ -101,7 +101,7 @@ async function fetchReviewsBase(supabase: SupabaseClient, contentId: string): Pr
 // page).
 const LIKED_SCORE_THRESHOLD = 4;
 
-async function fetchLikedTagIdsByUser(
+export async function fetchLikedTagIdsByUser(
   supabase: SupabaseClient,
   userIds: string[]
 ): Promise<Map<string, Set<string>>> {

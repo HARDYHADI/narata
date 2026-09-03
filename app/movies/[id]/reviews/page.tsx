@@ -5,6 +5,7 @@ import SiteFooter from "@/components/site-footer";
 import WriteBox from "@/components/reviews/write-box";
 import TagCloud from "@/components/reviews/tag-cloud";
 import ReviewList from "@/components/reviews/review-list";
+import TasteMatch from "@/components/reviews/taste-match";
 import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchMovieDetail } from "@/lib/movies/queries";
@@ -102,12 +103,7 @@ export default async function MovieReviewsPage({
               <h2>리뷰에서 자주 언급된 요소</h2>
               <div className="sub">리뷰와 선택형 태그를 함께 분석했어요.</div>
               <TagCloud contentId={id} initialTags={tagCloudInitial} />
-              <h3 style={{ marginTop: 25 }}>내 취향과의 일치</h3>
-              <p className="synopsis">
-                지우님이 높게 평가한 ‘서정적 미스터리’, ‘가족의 비밀’, ‘여운 있는 결말’ 요소와 강하게
-                일치해요.
-              </p>
-              <span className="pill orange">취향 일치 92%</span>
+              <TasteMatch contentTags={tagVotes} />
             </div>
           </div>
 
