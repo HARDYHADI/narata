@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchReviews, toggleReviewHelpful, type Review, type ReviewSort } from "@/lib/reviews/queries";
+import ReportButton from "@/components/community/report-button";
 
 function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -115,7 +116,7 @@ export default function ReviewList({
               <span style={{ cursor: "pointer" }} onClick={() => handleHelpful(r.id)}>
                 도움돼요 {r.helpful_count}
               </span>
-              <span>신고</span>
+              <ReportButton targetType="REVIEW" targetId={r.id} />
             </div>
           </article>
         ))}

@@ -63,6 +63,9 @@ interface DashboardData {
 export default function TasteDashboard() {
   const [status, setStatus] = useState<"loading" | "logged_out" | "ready">("loading");
   const [data, setData] = useState<DashboardData | null>(null);
+  const [fullActivity, setFullActivity] = useState<RecentActivityItem[] | null>(null);
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [loadingActivity, setLoadingActivity] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +146,26 @@ export default function TasteDashboard() {
   // more complete taste profile. Not a precise metric, just a proxy scaled
   // against a reasonable number of ratings.
   const completionPct = Math.min(100, Math.round((stats.ratingCount / 50) * 100));
+
+  async function handleToggleFullActivity() {
+    if (activityExpanded) {
+      setActivityExpanded(false);
+      return;
+    }
+    if (fullActivity) {
+      setActivityExpanded(true);
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    setLoadingActivity(true);
+    const activity = await fetchMyRecentActivity(supabase, 200);
+    setLoadingActivity(false);
+    setFullActivity(activity);
+    setActivityExpanded(true);
+  }
 
   async function handleClearAiLogs() {
     if (!window.confirm("AI 찾기 기록을 모두 지울까요? 되돌릴 수 없어요.")) return;
@@ -236,21 +259,27 @@ export default function TasteDashboard() {
                 <h3>최근 평가</h3>
                 <div className="sub">추천이 이상하면 평가를 수정해보세요.</div>
               </div>
-              <button className="tab">전체 기록</button>
+              <button type="button" className="tab" onClick={handleToggleFullActivity} disabled={loadingActivity}>
+                {activityExpanded ? "간략히 보기" : "전체 기록"}
+              </button>
             </div>
             <div className="history">
-              {recentActivity.length === 0 && <div className="sub">아직 평가한 작품이 없어요.</div>}
-              {recentActivity.map((h) => (
-                <div key={h.id} className="history-row">
-                  <div className="mini-cover" />
-                  <b title={h.review_body ?? undefined}>
-                    {h.title}
-                    {h.review_body ? " ✏️" : ""}
-                  </b>
-                  <span>{CONTENT_TYPE_LABELS[h.content_type] ?? h.content_type}</span>
-                  <span className="stars">★ {h.score.toFixed(1)}</span>
-                </div>
-              ))}
+              {loadingActivity && <div className="sub">불러오는 중...</div>}
+              {!loadingActivity && (activityExpanded ? fullActivity ?? [] : recentActivity).length === 0 && (
+                <div className="sub">아직 평가한 작품이 없어요.</div>
+              )}
+              {!loadingActivity &&
+                (activityExpanded ? fullActivity ?? [] : recentActivity).map((h) => (
+                  <Link key={h.id} href={`/movies/${h.content_id}`} className="history-row">
+                    <div className="mini-cover" />
+                    <b title={h.review_body ?? undefined}>
+                      {h.title}
+                      {h.review_body ? " ✏️" : ""}
+                    </b>
+                    <span>{CONTENT_TYPE_LABELS[h.content_type] ?? h.content_type}</span>
+                    <span className="stars">★ {h.score.toFixed(1)}</span>
+                  </Link>
+                ))}
             </div>
           </div>
         </div>
