@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 interface AnonymousCommentBody {
   postId?: string;
   body?: string;
+  parentCommentId?: string;
   guestNickname?: string;
   guestPassword?: string;
   captchaToken?: string;
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const { postId, guestNickname, guestPassword, captchaToken } = payload;
+  const { postId, parentCommentId, guestNickname, guestPassword, captchaToken } = payload;
   const body = payload.body?.trim();
 
   if (!postId || !body) {
@@ -62,6 +63,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "login_required" }, { status: 403 });
   }
 
+  if (parentCommentId) {
+    const { data: parent, error: parentError } = await admin
+      .from("comment")
+      .select("id, post_id")
+      .eq("id", parentCommentId)
+      .maybeSingle();
+    if (parentError) {
+      console.error("failed to load parent comment for anonymous reply", parentError);
+      return NextResponse.json({ error: "server_error" }, { status: 500 });
+    }
+    if (!parent || parent.post_id !== postId) {
+      return NextResponse.json({ error: "invalid_parent_comment" }, { status: 400 });
+    }
+  }
+
   const passwordHash = await hashGuestPassword(guestPassword);
   const ipHash = hashIp(getRequestIp(request));
 
@@ -69,6 +85,7 @@ export async function POST(request: NextRequest) {
     .from("comment")
     .insert({
       post_id: postId,
+      parent_comment_id: parentCommentId ?? null,
       guest_nickname: guestNickname?.trim() || "ㅇㅇ",
       guest_password_hash: passwordHash,
       ip_hash: ipHash,
