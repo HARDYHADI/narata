@@ -4,7 +4,7 @@ import AuthStatus from "@/components/auth-status";
 import HomeRecommendations from "@/components/home-recommendations";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { fetchTopRatedContent, fetchRecentMovies, type MovieListItem } from "@/lib/movies/queries";
-import { fetchCommunityFeed, type FeedPostItem } from "@/lib/community/queries";
+import { fetchCommunityFeed, fetchTrendingGalleries, type FeedPostItem, type TrendingGallery } from "@/lib/community/queries";
 
 export const revalidate = 60;
 
@@ -33,13 +33,6 @@ const TRENDING_TABS: { key: string; label: string; contentTypes: string[] }[] = 
 
 const TONES = ["tone-1", "tone-2", "tone-3", "tone-4", "tone-5"];
 
-const RANKING = [
-  { rank: 1, title: "호랑이의 계절", change: "▲ 12" },
-  { rank: 2, title: "검은 파도의 밤", change: "▲ 7" },
-  { rank: 3, title: "푸른 우체국", change: "NEW" },
-  { rank: 4, title: "회귀한 서기관", change: "▲ 3" },
-];
-
 function heroTag(movie: MovieListItem, contentType: string): string {
   const year = movie.release_date?.slice(0, 4);
   const genre = movie.content_genre[0]?.genre?.name;
@@ -56,15 +49,16 @@ export default async function Home({
 
   const supabase = getSupabaseClient();
 
-  const [heroMovie, heroDrama, heroAnime, trending, hotPosts] = supabase
+  const [heroMovie, heroDrama, heroAnime, trending, hotPosts, trendingGalleries] = supabase
     ? await Promise.all([
         fetchRecentMovies(supabase, 1, "MOVIE"),
         fetchRecentMovies(supabase, 1, "DRAMA"),
         fetchRecentMovies(supabase, 1, "ANIME"),
         fetchTopRatedContent(supabase, 5, activeTab.contentTypes),
         fetchCommunityFeed(supabase, "comments", 3),
+        fetchTrendingGalleries(supabase, 4),
       ])
-    : [[], [], [], [], []];
+    : [[], [], [], [], [], []];
 
   const heroTiles: { type: string; title: string; href: string; poster_url: string | null }[] = [
     ...(heroMovie[0]
@@ -97,10 +91,24 @@ export default async function Home({
             <Link href="/community">커뮤니티</Link>
           </nav>
           <div className="grow" />
-          <div className="search">
-            제목, 인물, 장면을 검색해보세요
-            <i />
-          </div>
+          <form action="/movies/search" method="get" className="search">
+            <input
+              type="text"
+              name="q"
+              placeholder="제목, 인물, 장면을 검색해보세요"
+              style={{
+                width: "100%",
+                border: "none",
+                background: "transparent",
+                font: "inherit",
+                color: "inherit",
+                outline: "none",
+              }}
+            />
+            <button type="submit" style={{ all: "unset", cursor: "pointer" }} aria-label="검색">
+              <i />
+            </button>
+          </form>
           <Link href="/ai" className="btn orange">
             AI 찾기
           </Link>
@@ -247,14 +255,18 @@ export default async function Home({
           <div className="home-lower">
             <HomeRecommendations />
             <div className="card rank">
-              <h2 style={{ fontSize: 24 }}>실시간 급상승</h2>
-              {RANKING.map((r) => (
-                <div key={r.rank} className="rankrow">
-                  <b>{r.rank}</b>
-                  <span>{r.title}</span>
-                  <small>{r.change}</small>
-                </div>
-              ))}
+              <h2 style={{ fontSize: 24 }}>지금 활발한 갤러리</h2>
+              {trendingGalleries.length === 0 ? (
+                <p className="muted">아직 데이터가 없어요.</p>
+              ) : (
+                trendingGalleries.map((g: TrendingGallery, i: number) => (
+                  <div key={g.id} className="rankrow">
+                    <b>{i + 1}</b>
+                    <span>{g.name}</span>
+                    <small>게시글 {g.post_count.toLocaleString()}</small>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
