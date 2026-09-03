@@ -6,6 +6,7 @@ import { createPostComment, fetchPostComments, type CommentItem } from "@/lib/co
 import { formatAuthor, formatRelativeTime } from "@/lib/community/format";
 import CaptchaWidget from "./captcha-widget";
 import ReportButton from "./report-button";
+import GuestCommentActions from "./guest-comment-actions";
 
 const MIN_GUEST_PASSWORD_LENGTH = 4;
 
@@ -128,6 +129,9 @@ export default function CommentSection({
           <div className="reaction">
             <ReportButton targetType="COMMENT" targetId={c.id} />
           </div>
+          {c.user_id === null && (
+            <GuestCommentActions commentId={c.id} currentBody={c.body} onChanged={refreshComments} />
+          )}
         </article>
       ))}
 
