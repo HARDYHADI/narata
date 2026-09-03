@@ -20,6 +20,7 @@ import CollectionPickerButton from "@/components/collection-picker-button";
 import MovieQaBox from "@/components/movie-qa-box";
 import AuthStatus from "@/components/auth-status";
 import RelationFeedbackButtons from "@/components/relation-feedback";
+import ShareButton from "@/components/share-button";
 
 export const revalidate = 60;
 
@@ -89,7 +90,7 @@ export default async function MovieDetailPage({
     <>
       <SiteHeader
         active="content"
-        searchPlaceholder="작품 안에서 검색"
+        searchPlaceholder="다른 작품 검색"
         actions={<AuthStatus />}
       />
 
@@ -146,7 +147,7 @@ export default async function MovieDetailPage({
             <div className="actions">
               <WatchlistButton contentId={movie.id} />
               <CollectionPickerButton contentId={movie.id} />
-              <button className="btn ghost">공유</button>
+              <ShareButton title={movie.canonical_title} />
             </div>
           </div>
           <aside className="card scorebox">

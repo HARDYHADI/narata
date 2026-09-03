@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import PreferenceToggle from "@/components/preference-toggle";
+import Link from "next/link";
 import {
   fetchMyPreferences,
   fetchMyStats,
   fetchMyRecentActivity,
   fetchTasteTags,
   fetchMyAiSearchLogs,
+  clearMyAiSearchLogs,
   DEFAULT_PREFERENCES,
   type UserPreference,
   type TasteStats,
@@ -142,6 +144,17 @@ export default function TasteDashboard() {
   // against a reasonable number of ratings.
   const completionPct = Math.min(100, Math.round((stats.ratingCount / 50) * 100));
 
+  async function handleClearAiLogs() {
+    if (!window.confirm("AI 찾기 기록을 모두 지울까요? 되돌릴 수 없어요.")) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const result = await clearMyAiSearchLogs(supabase);
+    if (result.success) {
+      setData((prev) => (prev ? { ...prev, aiLogs: [] } : prev));
+    }
+  }
+
   return (
     <div className="wrap">
       <div className="page-title">
@@ -195,7 +208,9 @@ export default function TasteDashboard() {
               ? `‘${tasteTags.liked[0].label}’ 등의 요소가 추천에 반영되고 있습니다.`
               : "좋아하는 요소가 쌓이면 추천에 반영돼요."}
           </p>
-          <button className="btn orange">추천 새로 보기</button>
+          <Link href="/" className="btn orange">
+            추천 보러 가기
+          </Link>
         </div>
       </div>
 
@@ -255,7 +270,7 @@ export default function TasteDashboard() {
               ))}
             </div>
           </div>
-          <div className="card taste-panel">
+          <div className="card taste-panel" id="preferences">
             <h3>추천 제어</h3>
             {CONTROL_ITEMS.map((c) => (
               <PreferenceToggle
@@ -266,10 +281,14 @@ export default function TasteDashboard() {
               />
             ))}
           </div>
-          <div className="card taste-panel">
+          <div className="card taste-panel" id="ai-logs">
             <div className="headrow" style={{ margin: 0 }}>
               <h3>최근 AI 찾기</h3>
-              <span className="pill">기록 관리</span>
+              {aiLogs.length > 0 && (
+                <span className="pill" style={{ cursor: "pointer" }} onClick={handleClearAiLogs}>
+                  기록 지우기
+                </span>
+              )}
             </div>
             {aiLogs.length === 0 && <div className="sub">아직 AI 찾기 기록이 없어요.</div>}
             {aiLogs.map((log) => (

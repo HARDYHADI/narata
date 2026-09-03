@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import CategoryBar from "@/components/category-bar";
@@ -45,7 +46,7 @@ export default function ComicsPage() {
         searchPlaceholder="작품·작가·출판사 검색"
         actions={
           <>
-            <button className="btn orange">AI 찾기</button>
+            <Link href="/ai" className="btn orange">AI 찾기</Link>
             <AuthStatus />
           </>
         }

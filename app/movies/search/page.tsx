@@ -4,9 +4,16 @@ import MovieBar from "@/components/movie-bar";
 import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { searchMovies } from "@/lib/movies/queries";
+import { formatContentTypeLabel } from "@/lib/movies/format";
 
-// NOTE: the AI-find sidebar prompt and "연관 검색어" are static sample
-// content — there's no query-suggestion or AI-search backend yet.
+// This doubles as the site's global header search results page (see
+// SiteHeader) — not movie-only despite the URL, same "shared surface,
+// original URL kept" precedent as /movies/[id]. searchMovies now spans
+// MOVIE/DRAMA/ANIME by default.
+//
+// NOTE: the AI-find sidebar prompt is a static example prompt (matches the
+// curated-example pattern used elsewhere, e.g. the /ai page's example
+// cards) — not a claim about real data.
 const RELATED = ["바다 영화", "섬 미스터리", "재난 영화", "감독으로 찾기"];
 
 export default async function MovieSearchPage({
@@ -26,8 +33,8 @@ export default async function MovieSearchPage({
 
       <div className="wrap">
         <div className="search-hero">
-          <span className="eyebrow">MOVIE SEARCH</span>
-          <h1 style={{ fontSize: 39, margin: "7px 0 20px" }}>영화 검색</h1>
+          <span className="eyebrow">SEARCH</span>
+          <h1 style={{ fontSize: 39, margin: "7px 0 20px" }}>통합 검색</h1>
           <form action="/movies/search" className="big-search">
             <input
               type="text"
@@ -53,14 +60,14 @@ export default async function MovieSearchPage({
           <div className="card">
             <div style={{ padding: 21 }}>
               {query ? (
-                <b>‘{query}’ 검색 결과 {results.length}편</b>
+                <b>‘{query}’ 검색 결과 {results.length}건</b>
               ) : (
                 <b>검색어를 입력해보세요</b>
               )}
             </div>
             {query && results.length === 0 && (
               <p className="muted" style={{ padding: "0 21px 21px" }}>
-                일치하는 영화를 찾지 못했어요.
+                일치하는 작품을 찾지 못했어요.
               </p>
             )}
             {results.map((movie) => (
@@ -78,7 +85,9 @@ export default async function MovieSearchPage({
                   )}
                 </div>
                 <div>
-                  <span className="pill">영화 · {movie.release_date?.slice(0, 4) ?? "미정"}</span>
+                  <span className="pill">
+                    {formatContentTypeLabel(movie.content_type)} · {movie.release_date?.slice(0, 4) ?? "미정"}
+                  </span>
                   <h3>{movie.canonical_title}</h3>
                   {movie.content_genre.length > 0 && (
                     <p className="sub">
@@ -109,9 +118,9 @@ export default async function MovieSearchPage({
               <h3>연관 검색어</h3>
               <div className="gallery">
                 {RELATED.map((tag) => (
-                  <span key={tag} className="pill">
+                  <Link key={tag} href={`/movies/search?q=${encodeURIComponent(tag)}`} className="pill">
                     {tag}
-                  </span>
+                  </Link>
                 ))}
               </div>
             </div>

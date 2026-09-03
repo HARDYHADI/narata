@@ -357,11 +357,15 @@ export async function fetchAiCandidateMovies(
   return (data ?? []) as unknown as AiCandidateMovie[];
 }
 
+// Default spans every real (ingested) content type — this backs the global
+// header search, not just the movie section, following the same "don't
+// duplicate the shared surface per content type" precedent as
+// fetchMovieDetail (see its NOTE).
 export async function searchMovies(
   supabase: SupabaseClient,
   query: string,
   limit = 20,
-  contentType: string = "MOVIE"
+  contentTypes: string[] = ["MOVIE", "DRAMA", "ANIME"]
 ): Promise<MovieListItem[]> {
   const term = query.trim();
   if (!term) return [];
@@ -369,7 +373,7 @@ export async function searchMovies(
   const { data, error } = await supabase
     .from("content")
     .select(MOVIE_LIST_SELECT)
-    .eq("content_type", contentType)
+    .in("content_type", contentTypes)
     .ilike("canonical_title", `%${term}%`)
     .order("release_date", { ascending: false, nullsFirst: false })
     .limit(limit);

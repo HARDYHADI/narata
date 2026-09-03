@@ -53,7 +53,7 @@ export default async function DramasPage() {
         searchPlaceholder="드라마 제목·배우·장면 검색"
         actions={
           <>
-            <button className="btn orange">AI 찾기</button>
+            <Link href="/ai" className="btn orange">AI 찾기</Link>
             <AuthStatus />
           </>
         }

@@ -38,10 +38,24 @@ export default function SiteHeader({
         </nav>
         <div className="grow" />
         {searchPlaceholder && (
-          <div className="search">
-            {searchPlaceholder}
-            <i />
-          </div>
+          <form action="/movies/search" method="get" className="search">
+            <input
+              type="text"
+              name="q"
+              placeholder={searchPlaceholder}
+              style={{
+                width: "100%",
+                border: "none",
+                background: "transparent",
+                font: "inherit",
+                color: "inherit",
+                outline: "none",
+              }}
+            />
+            <button type="submit" style={{ all: "unset", cursor: "pointer" }} aria-label="검색">
+              <i />
+            </button>
+          </form>
         )}
         {actions}
       </div>

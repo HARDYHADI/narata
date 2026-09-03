@@ -51,7 +51,7 @@ export default async function AnimePage() {
         searchPlaceholder="애니·성우·제작사 검색"
         actions={
           <>
-            <button className="btn orange">AI 찾기</button>
+            <Link href="/ai" className="btn orange">AI 찾기</Link>
             <AuthStatus />
           </>
         }

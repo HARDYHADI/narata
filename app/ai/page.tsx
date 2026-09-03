@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SiteHeader from "@/components/site-header";
 import AiSearch from "@/components/ai-search";
 import AuthStatus from "@/components/auth-status";
@@ -9,7 +10,9 @@ export default function AiFindPage() {
         active="ai"
         actions={
           <>
-            <button className="btn ghost">이전 질문</button>
+            <Link href="/taste#ai-logs" className="btn ghost">
+              이전 질문
+            </Link>
             <AuthStatus />
           </>
         }
