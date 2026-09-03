@@ -5,6 +5,7 @@ import type { CommentItem } from "@/lib/community/queries";
 import { formatAuthor, formatRelativeTime } from "@/lib/community/format";
 import ReportButton from "./report-button";
 import GuestCommentActions from "./guest-comment-actions";
+import OwnCommentActions from "./own-comment-actions";
 import CommentReplyForm from "./comment-reply-form";
 
 const INDENT_PER_DEPTH = 24;
@@ -49,8 +50,15 @@ export default function CommentNode({
         )}
         <ReportButton targetType="COMMENT" targetId={comment.id} />
       </div>
-      {comment.user_id === null && (
+      {comment.user_id === null ? (
         <GuestCommentActions commentId={comment.id} currentBody={comment.body} onChanged={onChanged} />
+      ) : (
+        <OwnCommentActions
+          commentId={comment.id}
+          authorUserId={comment.user_id}
+          currentBody={comment.body}
+          onChanged={onChanged}
+        />
       )}
       {replying && (
         <CommentReplyForm

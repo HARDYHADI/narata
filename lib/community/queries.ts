@@ -216,6 +216,53 @@ export async function createPost(
   return { success: true, postId: data.id as string };
 }
 
+// Logged-in post owner editing their own post. Guest (anonymous) posts use
+// the password-verified app/api/community/posts/[id]/guest-action route
+// instead — this one relies on RLS ("own update post": auth.uid() = user_id).
+export async function updateOwnPost(
+  supabase: SupabaseClient,
+  postId: string,
+  params: { title: string; body: string; containsSpoiler: boolean }
+): Promise<MutationResult> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "not_authenticated" };
+
+  const title = params.title.trim();
+  const body = params.body.trim();
+  if (!title || !body) return { success: false, error: "empty_fields" };
+
+  const { error } = await supabase
+    .from("post")
+    .update({ title, body, contains_spoiler: params.containsSpoiler, updated_at: new Date().toISOString() })
+    .eq("id", postId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error("failed to update post", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function deleteOwnPost(supabase: SupabaseClient, postId: string): Promise<MutationResult> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "not_authenticated" };
+
+  const { error } = await supabase.from("post").delete().eq("id", postId).eq("user_id", user.id);
+
+  if (error) {
+    console.error("failed to delete post", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
 // ---------------------------------------------------------------------------
 // Post likes
 // ---------------------------------------------------------------------------
@@ -360,6 +407,54 @@ export async function createPostComment(
   }
 
   return { success: true, commentId: data.id as string };
+}
+
+// Logged-in comment owner editing/deleting their own comment. Guest
+// (anonymous) comments use the password-verified
+// app/api/community/comments/[id]/guest-action route instead — these rely
+// on RLS ("own update comment" / "own delete comment": auth.uid() = user_id).
+// comment has no updated_at column, so an edit only changes body.
+export async function updateOwnComment(
+  supabase: SupabaseClient,
+  commentId: string,
+  body: string
+): Promise<MutationResult> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "not_authenticated" };
+
+  const trimmed = body.trim();
+  if (!trimmed) return { success: false, error: "empty_body" };
+
+  const { error } = await supabase
+    .from("comment")
+    .update({ body: trimmed })
+    .eq("id", commentId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error("failed to update comment", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function deleteOwnComment(supabase: SupabaseClient, commentId: string): Promise<MutationResult> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "not_authenticated" };
+
+  const { error } = await supabase.from("comment").delete().eq("id", commentId).eq("user_id", user.id);
+
+  if (error) {
+    console.error("failed to delete comment", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
 }
 
 // ---------------------------------------------------------------------------

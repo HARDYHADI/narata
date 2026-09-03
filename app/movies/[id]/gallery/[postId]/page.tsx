@@ -5,6 +5,7 @@ import SiteFooter from "@/components/site-footer";
 import LikeButton from "@/components/community/like-button";
 import ReportButton from "@/components/community/report-button";
 import GuestPostActions from "@/components/community/guest-post-actions";
+import OwnPostActions from "@/components/community/own-post-actions";
 import CommentSection from "@/components/community/comment-section";
 import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -79,9 +80,18 @@ export default async function PostDetailPage({
             <LikeButton postId={post.id} initialLikeCount={post.like_count} />
             <ReportButton targetType="POST" targetId={post.id} />
           </div>
-          {post.user_id === null && (
+          {post.user_id === null ? (
             <GuestPostActions
               postId={post.id}
+              currentTitle={post.title}
+              currentBody={post.body}
+              currentSpoiler={post.contains_spoiler}
+              basePath={basePath}
+            />
+          ) : (
+            <OwnPostActions
+              postId={post.id}
+              authorUserId={post.user_id}
               currentTitle={post.title}
               currentBody={post.body}
               currentSpoiler={post.contains_spoiler}
