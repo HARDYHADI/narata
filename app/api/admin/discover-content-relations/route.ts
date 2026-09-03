@@ -10,8 +10,15 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const PAGE_SIZE = 20;
-const DEADLINE_MS = 45_000;
+const PAGE_SIZE = 40;
+const DEADLINE_MS = 50_000;
+// Each content row makes up to ~6 sequential external calls (Wikidata
+// search/claims, Wikipedia extract, OpenAI extraction), so processing rows
+// one at a time only clears 8-15 per 45s window. Running a small batch of
+// rows concurrently multiplies that throughput without hammering Wikidata/
+// Wikipedia (free, keyless public APIs — see EXTERNAL_REQUEST_DELAY_MS)
+// harder than a human clicking around would.
+const CONCURRENCY = 8;
 
 /**
  * Bulk-runs content-relation discovery (Wikidata first, Wikipedia + grounded
@@ -68,19 +75,27 @@ export async function GET(request: NextRequest) {
         break;
       }
 
-      for (const row of rows as DiscoverableContent[]) {
-        try {
-          const result = await discoverRelationsForContent(supabase, row, indexes);
-          processed++;
-          tier1Count += result.tier1RelationsCreated;
-          tier2Count += result.tier2RelationsCreated;
-          if (result.tier1RelationsCreated + result.tier2RelationsCreated === 0) skippedCount++;
-        } catch (error) {
-          // A single content row failing (transient Wikidata/Wikipedia/OpenAI
-          // error) shouldn't stop the whole batch — log and move on.
-          console.error(`failed to discover relations for ${row.id}`, serializeError(error));
+      const contentRows = rows as DiscoverableContent[];
+      for (let i = 0; i < contentRows.length; i += CONCURRENCY) {
+        const chunk = contentRows.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          chunk.map((row) => discoverRelationsForContent(supabase, row, indexes))
+        );
+
+        for (let j = 0; j < chunk.length; j++) {
+          const outcome = results[j];
+          if (outcome.status === "fulfilled") {
+            processed++;
+            tier1Count += outcome.value.tier1RelationsCreated;
+            tier2Count += outcome.value.tier2RelationsCreated;
+            if (outcome.value.tier1RelationsCreated + outcome.value.tier2RelationsCreated === 0) skippedCount++;
+          } else {
+            // A single content row failing (transient Wikidata/Wikipedia/
+            // OpenAI error) shouldn't stop the whole batch — log and move on.
+            console.error(`failed to discover relations for ${chunk[j].id}`, serializeError(outcome.reason));
+          }
         }
-        lastId = row.id;
+        lastId = chunk[chunk.length - 1].id;
 
         if (Date.now() - startedAt > DEADLINE_MS) {
           nextCursor = lastId;
