@@ -46,13 +46,15 @@ export interface Review {
   created_at: string;
   score: number;
   author_nickname: string;
+  taste_match_count?: number;
 }
 
 const REVIEW_SELECT =
-  "id, body, contains_spoiler, helpful_count, created_at, profile(nickname), content_rating(score)";
+  "id, user_id, body, contains_spoiler, helpful_count, created_at, profile(nickname), content_rating(score)";
 
 interface ReviewRow {
   id: string;
+  user_id: string;
   body: string;
   contains_spoiler: boolean;
   helpful_count: number;
@@ -61,32 +63,8 @@ interface ReviewRow {
   content_rating: { score: number } | null;
 }
 
-export type ReviewSort = "helpful" | "latest";
-
-export async function fetchReviews(
-  supabase: SupabaseClient,
-  contentId: string,
-  sort: ReviewSort = "helpful"
-): Promise<Review[]> {
-  let query = supabase
-    .from("review")
-    .select(REVIEW_SELECT)
-    .eq("content_id", contentId)
-    .eq("is_hidden", false);
-
-  query =
-    sort === "latest"
-      ? query.order("created_at", { ascending: false })
-      : query.order("helpful_count", { ascending: false }).order("created_at", { ascending: false });
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("failed to load reviews", error);
-    return [];
-  }
-
-  return ((data ?? []) as unknown as ReviewRow[]).map((row) => ({
+function toReview(row: ReviewRow): Review {
+  return {
     id: row.id,
     body: row.body,
     contains_spoiler: row.contains_spoiler,
@@ -94,7 +72,136 @@ export async function fetchReviews(
     created_at: row.created_at,
     score: row.content_rating?.score ?? 0,
     author_nickname: row.profile?.nickname ?? "익명",
-  }));
+  };
+}
+
+export type ReviewSort = "helpful" | "latest" | "taste";
+
+async function fetchReviewsBase(supabase: SupabaseClient, contentId: string): Promise<ReviewRow[]> {
+  const { data, error } = await supabase
+    .from("review")
+    .select(REVIEW_SELECT)
+    .eq("content_id", contentId)
+    .eq("is_hidden", false)
+    .order("helpful_count", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("failed to load reviews", error);
+    return [];
+  }
+
+  return (data ?? []) as unknown as ReviewRow[];
+}
+
+// A user's "liked" tags: tags they voted on content they themselves rated
+// >= LIKED_SCORE_THRESHOLD (mirrors the definition in lib/taste/queries.ts'
+// fetchTasteTags, kept as a separate minimal query here since this only
+// needs the raw tag_id set, not the ranked/labeled top-10 used on the taste
+// page).
+const LIKED_SCORE_THRESHOLD = 4;
+
+async function fetchLikedTagIdsByUser(
+  supabase: SupabaseClient,
+  userIds: string[]
+): Promise<Map<string, Set<string>>> {
+  const result = new Map<string, Set<string>>();
+  if (userIds.length === 0) return result;
+
+  const { data: ratings, error: ratingsError } = await supabase
+    .from("content_rating")
+    .select("user_id, content_id")
+    .in("user_id", userIds)
+    .gte("score", LIKED_SCORE_THRESHOLD);
+
+  if (ratingsError) {
+    console.error("failed to load ratings for taste match", ratingsError);
+    return result;
+  }
+
+  const likedContentByUser = new Map<string, Set<string>>();
+  for (const row of ratings ?? []) {
+    const set = likedContentByUser.get(row.user_id as string) ?? new Set<string>();
+    set.add(row.content_id as string);
+    likedContentByUser.set(row.user_id as string, set);
+  }
+  if (likedContentByUser.size === 0) return result;
+
+  const { data: votes, error: votesError } = await supabase
+    .from("content_tag_vote")
+    .select("user_id, content_id, tag_id")
+    .in("user_id", Array.from(likedContentByUser.keys()));
+
+  if (votesError) {
+    console.error("failed to load tag votes for taste match", votesError);
+    return result;
+  }
+
+  for (const row of votes ?? []) {
+    const userId = row.user_id as string;
+    const likedContentIds = likedContentByUser.get(userId);
+    if (!likedContentIds || !likedContentIds.has(row.content_id as string)) continue;
+
+    const tagSet = result.get(userId) ?? new Set<string>();
+    tagSet.add(row.tag_id as string);
+    result.set(userId, tagSet);
+  }
+
+  return result;
+}
+
+// "내 취향순": ranks reviews by how many of the reviewer's own liked tags
+// (see fetchLikedTagIdsByUser) overlap with the current viewer's liked
+// tags — i.e. reviews from people whose taste overlaps yours come first.
+// Grounded in each side's own tag votes, never an LLM guess at similarity.
+async function sortReviewsByTasteMatch(
+  supabase: SupabaseClient,
+  rows: ReviewRow[]
+): Promise<Review[] | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const reviewerIds = Array.from(new Set(rows.map((r) => r.user_id)));
+  const likedTagsByUser = await fetchLikedTagIdsByUser(supabase, Array.from(new Set([user.id, ...reviewerIds])));
+  const myTags = likedTagsByUser.get(user.id) ?? new Set<string>();
+
+  const scored = rows.map((row) => {
+    const reviewerTags = likedTagsByUser.get(row.user_id) ?? new Set<string>();
+    let matchCount = 0;
+    for (const tagId of reviewerTags) {
+      if (myTags.has(tagId)) matchCount++;
+    }
+    return { review: toReview(row), matchCount };
+  });
+
+  scored.sort((a, b) => {
+    if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+    if (b.review.helpful_count !== a.review.helpful_count) return b.review.helpful_count - a.review.helpful_count;
+    return new Date(b.review.created_at).getTime() - new Date(a.review.created_at).getTime();
+  });
+
+  return scored.map(({ review, matchCount }) => ({ ...review, taste_match_count: matchCount }));
+}
+
+export async function fetchReviews(
+  supabase: SupabaseClient,
+  contentId: string,
+  sort: ReviewSort = "helpful"
+): Promise<Review[]> {
+  const rows = await fetchReviewsBase(supabase, contentId);
+  if (sort === "latest") {
+    return rows
+      .slice()
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .map(toReview);
+  }
+  if (sort === "taste") {
+    const tasteSorted = await sortReviewsByTasteMatch(supabase, rows);
+    if (tasteSorted) return tasteSorted;
+  }
+  return rows.map(toReview);
 }
 
 export interface MyRating {
