@@ -307,7 +307,8 @@ export interface CreateCommentResult extends MutationResult {
 export async function createPostComment(
   supabase: SupabaseClient,
   postId: string,
-  body: string
+  body: string,
+  parentCommentId: string | null = null
 ): Promise<CreateCommentResult> {
   const {
     data: { user },
@@ -319,7 +320,7 @@ export async function createPostComment(
 
   const { data, error } = await supabase
     .from("comment")
-    .insert({ post_id: postId, user_id: user.id, body: trimmed })
+    .insert({ post_id: postId, user_id: user.id, body: trimmed, parent_comment_id: parentCommentId })
     .select("id")
     .single();
 

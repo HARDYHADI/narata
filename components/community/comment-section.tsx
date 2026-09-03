@@ -3,12 +3,27 @@
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { createPostComment, fetchPostComments, type CommentItem } from "@/lib/community/queries";
-import { formatAuthor, formatRelativeTime } from "@/lib/community/format";
 import CaptchaWidget from "./captcha-widget";
-import ReportButton from "./report-button";
-import GuestCommentActions from "./guest-comment-actions";
+import CommentNode from "./comment-node";
 
 const MIN_GUEST_PASSWORD_LENGTH = 4;
+
+function buildCommentTree(comments: CommentItem[]) {
+  const topLevel: CommentItem[] = [];
+  const childrenByParent = new Map<string, CommentItem[]>();
+
+  for (const comment of comments) {
+    if (!comment.parent_comment_id) {
+      topLevel.push(comment);
+      continue;
+    }
+    const siblings = childrenByParent.get(comment.parent_comment_id) ?? [];
+    siblings.push(comment);
+    childrenByParent.set(comment.parent_comment_id, siblings);
+  }
+
+  return { topLevel, childrenByParent };
+}
 
 export default function CommentSection({
   postId,
@@ -107,6 +122,8 @@ export default function CommentSection({
     }
   }
 
+  const { topLevel, childrenByParent } = buildCommentTree(comments);
+
   return (
     <div className="card review-list">
       <div style={{ padding: 22 }}>
@@ -119,20 +136,17 @@ export default function CommentSection({
         </div>
       )}
 
-      {comments.map((c) => (
-        <article key={c.id} className="review-item">
-          <div className="review-head">
-            <b>{formatAuthor(c.profile?.nickname, c.guest_nickname, c.ip_hash)}</b>
-            <span className="sub">{formatRelativeTime(c.created_at)}</span>
-          </div>
-          <p>{c.body}</p>
-          <div className="reaction">
-            <ReportButton targetType="COMMENT" targetId={c.id} />
-          </div>
-          {c.user_id === null && (
-            <GuestCommentActions commentId={c.id} currentBody={c.body} onChanged={refreshComments} />
-          )}
-        </article>
+      {topLevel.map((c) => (
+        <CommentNode
+          key={c.id}
+          comment={c}
+          childrenByParent={childrenByParent}
+          depth={0}
+          postId={postId}
+          loggedIn={loggedIn}
+          allowAnonymousPosts={allowAnonymousPosts}
+          onChanged={refreshComments}
+        />
       ))}
 
       {ready && (
