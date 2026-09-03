@@ -10,11 +10,14 @@ export default function PostBoard({
   galleryId,
   basePath,
   initialPosts,
+  activeHead,
 }: {
   galleryId: string;
   /** e.g. `/movies/${id}/gallery` — each row links to `${basePath}/${post.id}`. */
   basePath: string;
   initialPosts: PostListItem[];
+  /** Current head filter (from ?head=), if any — carried into sort re-fetches. */
+  activeHead?: string | null;
 }) {
   const [sort, setSort] = useState<PostSort>("comments");
   const [posts, setPosts] = useState(initialPosts);
@@ -26,7 +29,7 @@ export default function PostBoard({
     setLoading(true);
     const supabase = getSupabaseClient();
     if (supabase) {
-      const data = await fetchGalleryPosts(supabase, galleryId, next);
+      const data = await fetchGalleryPosts(supabase, galleryId, next, 30, activeHead);
       setPosts(data);
     }
     setLoading(false);
