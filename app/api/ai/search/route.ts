@@ -4,12 +4,34 @@ import { createEmbedding } from "@/lib/embeddings/openai";
 import { fetchAiCandidateMovies } from "@/lib/movies/queries";
 import { rerankCandidates, type RerankCandidate } from "@/lib/ai/rerank";
 import { serializeError } from "@/lib/ingestion/ingestTmdbPopular";
+import { checkRateLimit, resolveBucketKey } from "@/lib/rate-limit";
+import { getRequestIp, hashIp } from "@/lib/community/guest";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const MAX_QUERY_LENGTH = 500;
 const VECTOR_MATCH_COUNT = 8;
+const RATE_LIMIT_ROUTE = "ai_search";
+const RATE_LIMIT_MAX_REQUESTS = 10;
+const RATE_LIMIT_WINDOW_MINUTES = 10;
+
+// Resolves the caller's user id (if any) from a bearer access token, shared
+// by the rate-limit bucket key and the search-log row so both agree on who
+// made the request.
+async function resolveUserId(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  request: NextRequest
+): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.toLowerCase().startsWith("bearer ")) return null;
+
+  const token = authHeader.slice(7).trim();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser(token);
+  return user?.id ?? null;
+}
 
 interface MatchRow {
   content_id: string;
@@ -34,6 +56,24 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = getSupabaseAdminClient();
+    const userId = await resolveUserId(supabase, request);
+    const ipHash = hashIp(getRequestIp(request));
+    const bucketKey = resolveBucketKey(userId, ipHash);
+
+    const rateLimit = await checkRateLimit(
+      supabase,
+      bucketKey,
+      RATE_LIMIT_ROUTE,
+      RATE_LIMIT_MAX_REQUESTS,
+      RATE_LIMIT_WINDOW_MINUTES
+    );
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "요청이 너무 많아요. 잠시 후 다시 시도해주세요." },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds ?? 60) } }
+      );
+    }
+
     const embedding = await createEmbedding(query);
 
     const { data: matches, error } = await supabase.rpc("match_movie_embeddings", {
@@ -97,7 +137,7 @@ export async function POST(request: NextRequest) {
         .filter((r) => r !== null);
     }
 
-    const searchLogId = await logAiSearch(supabase, request, query, results.length);
+    const searchLogId = await logAiSearch(supabase, userId, query, results.length);
 
     return NextResponse.json({ query, results, search_log_id: searchLogId });
   } catch (error) {
@@ -105,26 +145,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Resolves the caller's user id (if any) from a bearer access token and
-// inserts an ai_search_log row. Anonymous searches are logged with a null
+// Inserts an ai_search_log row. Anonymous searches are logged with a null
 // user_id. Logging failures never break the search response itself.
 async function logAiSearch(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
-  request: NextRequest,
+  userId: string | null,
   queryText: string,
   resultCount: number
 ): Promise<string | null> {
   try {
-    let userId: string | null = null;
-    const authHeader = request.headers.get("authorization");
-    if (authHeader?.toLowerCase().startsWith("bearer ")) {
-      const token = authHeader.slice(7).trim();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser(token);
-      userId = user?.id ?? null;
-    }
-
     const { data, error } = await supabase
       .from("ai_search_log")
       .insert({ user_id: userId, query_text: queryText, result_count: resultCount })

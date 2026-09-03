@@ -27,7 +27,7 @@ export default function MovieQaBox({ contentId }: { contentId: string }) {
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data?.answer) {
-        setError("답변을 가져오지 못했어요. 잠시 후 다시 시도해주세요.");
+        setError(typeof data?.error === "string" ? data.error : "답변을 가져오지 못했어요. 잠시 후 다시 시도해주세요.");
         return;
       }
 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createEmbedding } from "@/lib/embeddings/openai";
 import { serializeError } from "@/lib/ingestion/ingestTmdbPopular";
+import { checkRateLimit, resolveBucketKey } from "@/lib/rate-limit";
+import { getRequestIp, hashIp } from "@/lib/community/guest";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -9,6 +11,23 @@ export const maxDuration = 30;
 const CHAT_MODEL = "gpt-4o-mini";
 const MAX_QUESTION_LENGTH = 500;
 const VECTOR_MATCH_COUNT = 6;
+const RATE_LIMIT_ROUTE = "ai_ask";
+const RATE_LIMIT_MAX_REQUESTS = 15;
+const RATE_LIMIT_WINDOW_MINUTES = 10;
+
+async function resolveUserId(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  request: NextRequest
+): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.toLowerCase().startsWith("bearer ")) return null;
+
+  const token = authHeader.slice(7).trim();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser(token);
+  return user?.id ?? null;
+}
 
 interface MatchRow {
   id: string;
@@ -91,6 +110,23 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = getSupabaseAdminClient();
+    const userId = await resolveUserId(supabase, request);
+    const ipHash = hashIp(getRequestIp(request));
+    const bucketKey = resolveBucketKey(userId, ipHash);
+
+    const rateLimit = await checkRateLimit(
+      supabase,
+      bucketKey,
+      RATE_LIMIT_ROUTE,
+      RATE_LIMIT_MAX_REQUESTS,
+      RATE_LIMIT_WINDOW_MINUTES
+    );
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "요청이 너무 많아요. 잠시 후 다시 시도해주세요." },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds ?? 60) } }
+      );
+    }
 
     const { data: content, error: contentError } = await supabase
       .from("content")
