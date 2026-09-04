@@ -208,10 +208,10 @@ export default function TasteDashboard() {
                 <b>{stats.reviewCount}</b>
                 <span className="sub">리뷰</span>
               </div>
-              <div className="stat">
+              <Link href="/collections" className="stat" style={{ textDecoration: "none", color: "inherit" }}>
                 <b>{stats.collectionCount}</b>
                 <span className="sub">컬렉션</span>
-              </div>
+              </Link>
               <div className="stat">
                 <b>{stats.averageScore > 0 ? stats.averageScore.toFixed(1) : "-"}</b>
                 <span className="sub">평균 별점</span>
