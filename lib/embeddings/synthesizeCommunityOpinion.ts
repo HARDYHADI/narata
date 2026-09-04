@@ -218,6 +218,7 @@ async function callSynthesisLlm(
       response_format: { type: "json_object" },
       temperature: 0.3,
     }),
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {

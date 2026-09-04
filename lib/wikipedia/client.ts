@@ -30,7 +30,10 @@ async function fetchFullTextForLang(title: string, lang: "ko" | "en"): Promise<W
   url.searchParams.set("format", "json");
   url.searchParams.set("formatversion", "2");
 
-  const res = await fetch(url.toString(), { headers: { "User-Agent": USER_AGENT, accept: "application/json" } });
+  const res = await fetch(url.toString(), {
+    headers: { "User-Agent": USER_AGENT, accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
+  });
   await sleep(EXTERNAL_REQUEST_DELAY_MS);
 
   if (!res.ok) {

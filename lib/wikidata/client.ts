@@ -24,7 +24,10 @@ async function fetchWbSearchEntities(
   url.searchParams.set("format", "json");
   url.searchParams.set("type", "item");
 
-  const res = await fetch(url.toString(), { headers: { "User-Agent": USER_AGENT } });
+  const res = await fetch(url.toString(), {
+    headers: { "User-Agent": USER_AGENT },
+    signal: AbortSignal.timeout(10_000),
+  });
   await sleep(EXTERNAL_REQUEST_DELAY_MS);
 
   if (!res.ok) {
@@ -129,6 +132,7 @@ interface EntityDataResponse {
 async function fetchEntityData(qid: string): Promise<WikidataEntity | null> {
   const res = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`, {
     headers: { "User-Agent": USER_AGENT },
+    signal: AbortSignal.timeout(10_000),
   });
   await sleep(EXTERNAL_REQUEST_DELAY_MS);
 
@@ -159,7 +163,10 @@ async function resolveLabels(qids: string[]): Promise<Map<string, string | null>
   url.searchParams.set("languages", "ko|en");
   url.searchParams.set("format", "json");
 
-  const res = await fetch(url.toString(), { headers: { "User-Agent": USER_AGENT } });
+  const res = await fetch(url.toString(), {
+    headers: { "User-Agent": USER_AGENT },
+    signal: AbortSignal.timeout(10_000),
+  });
   await sleep(EXTERNAL_REQUEST_DELAY_MS);
 
   if (!res.ok) {

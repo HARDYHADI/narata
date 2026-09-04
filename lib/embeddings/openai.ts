@@ -14,6 +14,7 @@ export async function createEmbedding(text: string): Promise<number[]> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model: EMBEDDING_MODEL, input: text }),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!res.ok) {

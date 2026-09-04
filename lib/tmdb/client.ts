@@ -77,7 +77,7 @@ async function tmdbFetch<T>(
   const url = new URL(`${TMDB_BASE_URL}${path}`);
   url.search = new URLSearchParams(params).toString();
 
-  const res = await fetch(url, { headers: getAuthHeaders() });
+  const res = await fetch(url, { headers: getAuthHeaders(), signal: AbortSignal.timeout(10_000) });
 
   if (!res.ok) {
     throw new Error(`TMDB request failed: ${res.status} ${path}`);

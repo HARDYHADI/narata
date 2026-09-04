@@ -68,6 +68,7 @@ export async function rerankCandidates(
       response_format: { type: "json_object" },
       temperature: 0.2,
     }),
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {
