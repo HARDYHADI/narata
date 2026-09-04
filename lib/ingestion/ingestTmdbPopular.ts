@@ -375,7 +375,12 @@ export interface BackfillSummary {
   results: IngestResult[];
 }
 
-export const DEFAULT_BACKFILL_DEADLINE_MS = 45_000;
+// Now that every external fetch this pipeline makes (TMDB, and OpenAI/
+// Wikidata/Wikipedia elsewhere) carries its own AbortSignal.timeout, a
+// single page's worst-case time is bounded rather than unbounded — but the
+// deadline here is only checked between pages, so this still leaves a
+// margin below Vercel's 60s maxDuration for a worst-case last page.
+export const DEFAULT_BACKFILL_DEADLINE_MS = 35_000;
 
 /**
  * Runs `runPage(page, limit)` for consecutive pages starting at `startPage`,

@@ -7,7 +7,30 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const PAGE_SIZE = 50;
-const DEADLINE_MS = 45_000;
+// See discover-content-relations/route.ts for why this needs both a per-item
+// timeout and a deadline check with real margin below Vercel's 60s
+// maxDuration: synthesizeCommunityOpinion makes up to 3 sequential OpenAI
+// calls (1 chat completion + 2 embeddings) per item, and without bounding
+// worst-case per-item time, a single slow call could push the deadline
+// check itself past the hard limit.
+const DEADLINE_MS = 35_000;
+const PER_ITEM_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
 
 /**
  * Bulk-runs community-opinion synthesis over every `content` row, ordered by
@@ -59,7 +82,7 @@ export async function GET(request: NextRequest) {
       for (const row of rows) {
         const contentId = row.id as string;
         try {
-          const result = await synthesizeCommunityOpinion(contentId);
+          const result = await withTimeout(synthesizeCommunityOpinion(contentId), PER_ITEM_TIMEOUT_MS);
           processed++;
           if (result.skipped) {
             skipped++;

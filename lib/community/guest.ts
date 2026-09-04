@@ -67,6 +67,7 @@ export async function verifyTurnstile(token: string | null | undefined): Promise
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ secret, response: token }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     const result = (await response.json()) as TurnstileVerifyResponse;
