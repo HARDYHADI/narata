@@ -11,7 +11,11 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const PAGE_SIZE = 40;
-const DEADLINE_MS = 50_000;
+// Kept well under maxDuration (60s): the deadline is only checked between
+// chunks, and a chunk can take up to PER_ITEM_TIMEOUT_MS (concurrent items
+// in a chunk are bounded by the slowest one, not summed) — 40s + 10s worst
+// case leaves real margin before Vercel kills the function outright.
+const DEADLINE_MS = 40_000;
 // Each content row makes up to ~6 sequential external calls (Wikidata
 // search/claims, Wikipedia extract, OpenAI extraction), so processing rows
 // one at a time only clears 8-15 per 45s window. Running a small batch of
@@ -19,6 +23,31 @@ const DEADLINE_MS = 50_000;
 // Wikipedia (free, keyless public APIs — see EXTERNAL_REQUEST_DELAY_MS)
 // harder than a human clicking around would.
 const CONCURRENCY = 8;
+// None of the external calls inside discoverRelationsForContent (Wikidata,
+// Wikipedia, OpenAI) set their own fetch timeout, so a single hung request
+// could previously stall an entire concurrent chunk past the deadline check
+// and past Vercel's maxDuration, killing the whole invocation outright
+// (observed as a raw Vercel "Serverless Function has timed out" page, with
+// no response ever sent — no processed count, no after() continuation).
+// Racing each item against this timeout bounds the worst case regardless of
+// how many sequential sub-calls it makes internally.
+const PER_ITEM_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
 
 /**
  * Bulk-runs content-relation discovery (Wikidata first, Wikipedia + grounded
@@ -79,7 +108,7 @@ export async function GET(request: NextRequest) {
       for (let i = 0; i < contentRows.length; i += CONCURRENCY) {
         const chunk = contentRows.slice(i, i + CONCURRENCY);
         const results = await Promise.allSettled(
-          chunk.map((row) => discoverRelationsForContent(supabase, row, indexes))
+          chunk.map((row) => withTimeout(discoverRelationsForContent(supabase, row, indexes), PER_ITEM_TIMEOUT_MS))
         );
 
         for (let j = 0; j < chunk.length; j++) {
