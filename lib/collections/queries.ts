@@ -114,6 +114,7 @@ export interface Collection {
   description: string | null;
   is_public: boolean;
   created_at: string;
+  item_count: number;
 }
 
 export async function fetchMyCollections(
@@ -135,7 +136,26 @@ export async function fetchMyCollections(
     return [];
   }
 
-  return (data ?? []) as Collection[];
+  const collections = (data ?? []) as Omit<Collection, "item_count">[];
+  if (collections.length === 0) return [];
+
+  const { data: itemRows, error: itemsError } = await supabase
+    .from("collection_item")
+    .select("collection_id")
+    .in(
+      "collection_id",
+      collections.map((c) => c.id)
+    );
+
+  if (itemsError) console.error("failed to load collection item counts", itemsError);
+
+  const counts = new Map<string, number>();
+  for (const row of itemRows ?? []) {
+    const id = row.collection_id as string;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+
+  return collections.map((c) => ({ ...c, item_count: counts.get(c.id) ?? 0 }));
 }
 
 export interface CreateCollectionResult extends MutationResult {
@@ -172,7 +192,7 @@ export async function createCollection(
     return { success: false, error: error.message };
   }
 
-  return { success: true, collection: data as Collection };
+  return { success: true, collection: { ...(data as Omit<Collection, "item_count">), item_count: 0 } };
 }
 
 export interface CollectionItem {
@@ -183,6 +203,7 @@ export interface CollectionItem {
 }
 
 export interface CollectionDetail extends Collection {
+  user_id: string;
   items: CollectionItem[];
 }
 
@@ -192,7 +213,7 @@ export async function fetchCollection(
 ): Promise<CollectionDetail | null> {
   const { data: collection, error: collectionError } = await supabase
     .from("collection")
-    .select("id, name, description, is_public, created_at")
+    .select("id, user_id, name, description, is_public, created_at")
     .eq("id", collectionId)
     .maybeSingle();
 
@@ -210,7 +231,7 @@ export async function fetchCollection(
 
   if (itemsError) {
     console.error("failed to load collection items", itemsError);
-    return { ...(collection as Collection), items: [] };
+    return { ...(collection as Omit<CollectionDetail, "item_count" | "items">), item_count: 0, items: [] };
   }
 
   const rows = (items ?? []) as { content_id: string; note: string | null; added_at: string }[];
@@ -221,7 +242,8 @@ export async function fetchCollection(
   const movieById = new Map(movies.map((movie) => [movie.id, movie]));
 
   return {
-    ...(collection as Collection),
+    ...(collection as Omit<CollectionDetail, "item_count" | "items">),
+    item_count: rows.length,
     items: rows.map((row) => ({
       content_id: row.content_id,
       note: row.note,
