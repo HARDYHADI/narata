@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { hashGuestPassword, hashIp, getRequestIp, verifyTurnstile } from "@/lib/community/guest";
 import { POST_HEADS } from "@/lib/community/format";
+import { checkRateLimit, resolveBucketKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,9 @@ interface AnonymousPostBody {
 }
 
 const MIN_GUEST_PASSWORD_LENGTH = 4;
+const RATE_LIMIT_ROUTE = "community_anonymous_post";
+const RATE_LIMIT_MAX_REQUESTS = 10;
+const RATE_LIMIT_WINDOW_MINUTES = 10;
 
 // Anonymous post creation. Logged-in users insert directly via the browser
 // Supabase client (RLS handles it — see lib/community/queries.ts#createPost);
@@ -44,12 +48,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "weak_password" }, { status: 400 });
   }
 
+  const admin = getSupabaseAdminClient();
+  const ipHash = hashIp(getRequestIp(request));
+  const rateLimit = await checkRateLimit(
+    admin,
+    resolveBucketKey(null, ipHash),
+    RATE_LIMIT_ROUTE,
+    RATE_LIMIT_MAX_REQUESTS,
+    RATE_LIMIT_WINDOW_MINUTES
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "요청이 너무 많아요. 잠시 후 다시 시도해주세요." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds ?? 60) } }
+    );
+  }
+
   const captchaOk = await verifyTurnstile(captchaToken);
   if (!captchaOk) {
     return NextResponse.json({ error: "captcha_failed" }, { status: 403 });
   }
-
-  const admin = getSupabaseAdminClient();
 
   const { data: gallery, error: galleryError } = await admin
     .from("gallery")
@@ -69,7 +87,6 @@ export async function POST(request: NextRequest) {
   }
 
   const passwordHash = await hashGuestPassword(guestPassword);
-  const ipHash = hashIp(getRequestIp(request));
 
   const { data, error } = await admin
     .from("post")
