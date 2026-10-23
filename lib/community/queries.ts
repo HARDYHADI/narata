@@ -82,7 +82,7 @@ export interface PostListItem {
 }
 
 const POST_LIST_SELECT =
-  "id, gallery_id, head, title, is_notice, contains_spoiler, view_count, like_count, comment_count, created_at, user_id, guest_nickname, ip_hash, profile(nickname)";
+  "id, gallery_id, head, title, is_notice, contains_spoiler, view_count, like_count, comment_count, created_at, user_id, guest_nickname, ip_hash, profile!post_user_id_fkey(nickname)";
 
 export type PostSort = "latest" | "comments";
 
@@ -149,7 +149,7 @@ export interface PostDetail extends PostListItem {
 }
 
 const POST_DETAIL_SELECT =
-  "id, gallery_id, head, title, body, is_notice, contains_spoiler, view_count, like_count, comment_count, created_at, user_id, guest_nickname, ip_hash, profile(nickname)";
+  "id, gallery_id, head, title, body, is_notice, contains_spoiler, view_count, like_count, comment_count, created_at, user_id, guest_nickname, ip_hash, profile!post_user_id_fkey(nickname)";
 
 export async function fetchPost(
   supabase: SupabaseClient,
@@ -518,7 +518,7 @@ export interface FeedPostItem {
 }
 
 const FEED_SELECT =
-  "id, gallery_id, head, title, is_notice, comment_count, view_count, like_count, created_at, user_id, guest_nickname, ip_hash, profile(nickname), gallery(name, content(id, canonical_title, content_type))";
+  "id, gallery_id, head, title, is_notice, comment_count, view_count, like_count, created_at, user_id, guest_nickname, ip_hash, profile!post_user_id_fkey(nickname), gallery(name, content(id, canonical_title, content_type))";
 
 export async function fetchCommunityFeed(
   supabase: SupabaseClient,
