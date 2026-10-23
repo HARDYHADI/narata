@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { isAuthorizedAdminRequest, adminAuthHeaders } from "@/lib/admin-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { serializeError } from "@/lib/ingestion/ingestTmdbPopular";
 import { synthesizeCommunityOpinion } from "@/lib/embeddings/synthesizeCommunityOpinion";
@@ -43,10 +44,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  * again once real community data exists.
  */
 export async function GET(request: NextRequest) {
-  const secret = process.env.INGEST_ADMIN_SECRET;
-  const providedSecret = request.headers.get("authorization")?.replace(/^Bearer /, "");
-
-  if (!secret || providedSecret !== secret) {
+  if (!isAuthorizedAdminRequest(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -119,7 +117,7 @@ export async function GET(request: NextRequest) {
       nextUrl.searchParams.set("cursor", nextCursor);
       after(async () => {
         try {
-          await fetch(nextUrl.toString(), { headers: { authorization: `Bearer ${secret}` } });
+          await fetch(nextUrl.toString(), { headers: adminAuthHeaders() });
         } catch (error) {
           console.error(
             "failed to chain synthesize-community-opinion continuation",
