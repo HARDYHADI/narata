@@ -28,7 +28,7 @@ const MAX_TARGET_TV_SHOWS = 10000;
  */
 export async function GET(request: NextRequest) {
   const secret = process.env.INGEST_ADMIN_SECRET;
-  const providedSecret = request.nextUrl.searchParams.get("secret");
+  const providedSecret = request.headers.get("authorization")?.replace(/^Bearer /, "");
 
   if (!secret || providedSecret !== secret) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       nextUrl.searchParams.set("page", String(summary.nextPage));
       after(async () => {
         try {
-          await fetch(nextUrl.toString());
+          await fetch(nextUrl.toString(), { headers: { authorization: `Bearer ${secret}` } });
         } catch (error) {
           console.error("failed to chain backfill-top-tv-shows continuation", serializeError(error));
         }

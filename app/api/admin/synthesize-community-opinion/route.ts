@@ -44,7 +44,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  */
 export async function GET(request: NextRequest) {
   const secret = process.env.INGEST_ADMIN_SECRET;
-  const providedSecret = request.nextUrl.searchParams.get("secret");
+  const providedSecret = request.headers.get("authorization")?.replace(/^Bearer /, "");
 
   if (!secret || providedSecret !== secret) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
       nextUrl.searchParams.set("cursor", nextCursor);
       after(async () => {
         try {
-          await fetch(nextUrl.toString());
+          await fetch(nextUrl.toString(), { headers: { authorization: `Bearer ${secret}` } });
         } catch (error) {
           console.error(
             "failed to chain synthesize-community-opinion continuation",
