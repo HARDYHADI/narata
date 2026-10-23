@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { isAuthorizedAdminRequest, adminAuthHeaders } from "@/lib/admin-auth";
 import { fetchMoviesByVoteCount } from "@/lib/tmdb/client";
 import { runTmdbBackfillFromSource, serializeError } from "@/lib/ingestion/ingestTmdbPopular";
 
@@ -19,10 +20,7 @@ const MAX_TARGET_MOVIES = 10000;
  * the caller to manually resume with the returned `nextPage` each time.
  */
 export async function GET(request: NextRequest) {
-  const secret = process.env.INGEST_ADMIN_SECRET;
-  const providedSecret = request.headers.get("authorization")?.replace(/^Bearer /, "");
-
-  if (!secret || providedSecret !== secret) {
+  if (!isAuthorizedAdminRequest(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -53,7 +51,7 @@ export async function GET(request: NextRequest) {
       nextUrl.searchParams.set("page", String(summary.nextPage));
       after(async () => {
         try {
-          await fetch(nextUrl.toString(), { headers: { authorization: `Bearer ${secret}` } });
+          await fetch(nextUrl.toString(), { headers: adminAuthHeaders() });
         } catch (error) {
           console.error("failed to chain backfill-top-movies continuation", serializeError(error));
         }

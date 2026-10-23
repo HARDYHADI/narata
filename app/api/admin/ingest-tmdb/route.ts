@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { runTmdbBackfill, serializeError } from "@/lib/ingestion/ingestTmdbPopular";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.INGEST_ADMIN_SECRET;
-  const providedSecret = request.headers.get("authorization")?.replace(/^Bearer /, "");
-
-  if (!secret || providedSecret !== secret) {
+  if (!isAuthorizedAdminRequest(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
