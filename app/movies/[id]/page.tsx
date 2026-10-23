@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseAdminClientOrNull } from "@/lib/supabase/admin";
 import { fetchMovieDetail, fetchContentRelations } from "@/lib/movies/queries";
 import { fetchContentVideos, fetchContentWatchProviders } from "@/lib/movies/media";
 import {
@@ -66,7 +67,8 @@ export default async function MovieDetailPage({
       ])
     : [[], [], [], [], []];
 
-  const galleryId = supabase ? await getOrCreateContentGallery(supabase, movie.id) : null;
+  const admin = getSupabaseAdminClientOrNull();
+  const galleryId = admin ? await getOrCreateContentGallery(admin, movie.id) : null;
   const [gallery, galleryPosts] =
     galleryId && supabase
       ? await Promise.all([

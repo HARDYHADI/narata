@@ -9,6 +9,7 @@ import OwnPostActions from "@/components/community/own-post-actions";
 import CommentSection from "@/components/community/comment-section";
 import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseAdminClientOrNull } from "@/lib/supabase/admin";
 import { fetchMovieDetail } from "@/lib/movies/queries";
 import { fetchPost, fetchGallery, fetchPostComments, recordPostView } from "@/lib/community/queries";
 import { formatAuthor, formatRelativeTime } from "@/lib/community/format";
@@ -36,7 +37,8 @@ export default async function PostDetailPage({
   ]);
 
   // Fire-and-forget: don't block rendering on the view-count RPC.
-  void recordPostView(supabase, postId);
+  const admin = getSupabaseAdminClientOrNull();
+  if (admin) void recordPostView(admin, postId);
 
   const basePath = `/movies/${id}/gallery`;
 

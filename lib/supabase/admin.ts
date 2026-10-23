@@ -20,3 +20,12 @@ export function getSupabaseAdminClient(): SupabaseClient {
 
   return adminClient;
 }
+
+// For server-rendered pages that should degrade (not crash) where the
+// service-role key isn't configured, e.g. preview deployments.
+export function getSupabaseAdminClientOrNull(): SupabaseClient | null {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+  return getSupabaseAdminClient();
+}

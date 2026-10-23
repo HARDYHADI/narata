@@ -6,6 +6,7 @@ import PostBoard from "@/components/community/post-board";
 import PostWriteBox from "@/components/community/post-write-box";
 import AuthStatus from "@/components/auth-status";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseAdminClientOrNull } from "@/lib/supabase/admin";
 import { fetchMovieDetail } from "@/lib/movies/queries";
 import {
   getOrCreateContentGallery,
@@ -33,7 +34,8 @@ export default async function MovieGalleryPage({
   const movie = await fetchMovieDetail(supabase, id);
   if (!movie) notFound();
 
-  const galleryId = await getOrCreateContentGallery(supabase, id);
+  const admin = getSupabaseAdminClientOrNull();
+  const galleryId = admin ? await getOrCreateContentGallery(admin, id) : null;
   if (!galleryId) notFound();
 
   const [gallery, posts, headCounts, trending] = await Promise.all([
