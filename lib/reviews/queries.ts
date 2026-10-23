@@ -50,7 +50,7 @@ export interface Review {
 }
 
 const REVIEW_SELECT =
-  "id, user_id, body, contains_spoiler, helpful_count, created_at, profile(nickname), content_rating(score)";
+  "id, user_id, body, contains_spoiler, helpful_count, created_at, profile!review_user_id_fkey(nickname), content_rating(score)";
 
 interface ReviewRow {
   id: string;
