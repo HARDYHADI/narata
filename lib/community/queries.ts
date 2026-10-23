@@ -25,6 +25,7 @@ const GALLERY_SELECT =
 
 // Lazily creates the gallery for a piece of content on first visit (via the
 // SECURITY DEFINER RPC — there is no direct INSERT grant on `gallery`).
+// The RPC is service_role-only, so pass the admin client.
 export async function getOrCreateContentGallery(
   supabase: SupabaseClient,
   contentId: string
@@ -169,6 +170,8 @@ export async function fetchPost(
   return data as unknown as PostDetail | null;
 }
 
+// service_role-only RPC (anon could otherwise call it directly to inflate
+// view counts) — pass the admin client.
 export async function recordPostView(supabase: SupabaseClient, postId: string): Promise<void> {
   const { error } = await supabase.rpc("increment_post_view_count", { p_post_id: postId });
   if (error) console.error("failed to record post view", error);

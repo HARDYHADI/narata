@@ -6,7 +6,7 @@ export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const secret = process.env.INGEST_ADMIN_SECRET;
-  const providedSecret = request.nextUrl.searchParams.get("secret");
+  const providedSecret = request.headers.get("authorization")?.replace(/^Bearer /, "");
 
   if (!secret || providedSecret !== secret) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
